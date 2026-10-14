@@ -1,0 +1,123 @@
+# =============================================================================
+# hermes-pentest — OODA pentest con Hermes hablando DIRECTO a Kali-MCP.
+# =============================================================================
+# Qué es: un bucle OODA de pentest conducido por Hermes (nousresearch/hermes-agent)
+# que ejecuta herramientas DIRECTAMENTE en un contenedor Kali vía su servidor MCP.
+# NO hay core/API/UI de PentAgent: solo DOS contenedores.
+#   - kali       : runtime determinista de tools (kali-mcp escuchando en :8900).
+#   - ooda-agent : Hermes como CEREBRO conductor del bucle OODA, cliente directo del
+#                  MCP de kali (kali:8900). Driver del OODA, sin intermediarios.
+#
+# Arranque:
+#   cp .env.example .env   # y rellena OPENROUTER_API_KEY y HERMES_API_SERVER_KEY
+#   docker compose up -d --build
+#   docker compose exec -it ooda-agent hermes chat   # TUI interactivo
+#
+# ADVERTENCIA (intencional): este producto NO tiene los guardarraíles de PentAgent.
+# NO hay scope-guard, NO hay consentimiento, NO hay audit, NO hay gate E4. Hermes
+# ejecuta lo que decida directamente contra el objetivo. Úsalo SOLO contra targets
+# explícitamente autorizados y en un entorno controlado. La responsabilidad del
+# alcance recae enteramente en el operador.
+#
+# Multi-arch: cada build declara platforms [linux/arm64, linux/amd64]. En Mac M2
+# se ejecuta arm64 nativo.
+
+services:
+  kali:
+    build:
+      context: .
+      dockerfile: docker/kali/Dockerfile
+      platforms:
+        - linux/arm64
+        - linux/amd64
+    image: hermes-pentest-kali:dev
+    environment:
+      # --- AWS read-only (OPCIONAL en este producto) ---
+      # Prowler/ScoutSuite/Cloudsplaining corren DENTRO de este contenedor. Si se van
+      # a usar las tools de recolección cloud, define estas credenciales en .env; si no,
+      # quedan vacías y las tools cloud simplemente no tendrán con qué autenticar.
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      # Opcional: solo para credenciales temporales (STS).
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
+      # Puerto del servidor kali-mcp dentro del contenedor. Overridable sin reconstruir.
+      KALI_MCP_PORT: "8900"
+      # --- Plano de DATOS de artefactos (puerto dedicado, red interna) ---
+      KALI_ARTIFACTS_PORT: "8901"
+      # Token compartido del canal de datos (opcional en este producto).
+      KALI_ARTIFACTS_TOKEN: "${KALI_ARTIFACTS_TOKEN:-}"
+      # --- Prowler (opcional): acota el escaneo cloud si se usa ---
+      PROWLER_STATUS: "${PROWLER_STATUS:-FAIL}"
+      PROWLER_REGIONS: "${PROWLER_REGIONS-${AWS_REGION:-us-east-1}}"
+      PROWLER_SERVICES: "${PROWLER_SERVICES-iam s3}"
+      PROWLER_TIMEOUT: "${PROWLER_TIMEOUT:-1800}"
+    # Puerto del servidor kali-mcp (expuesto para inspección directa desde el host si
+    # hace falta; ooda-agent lo alcanza por la red interna como kali:8900).
+    ports:
+      - "8900:8900"
+    # HEALTHCHECK: comprueba que el servidor MCP acepta conexiones TCP en :8900, para
+    # que ooda-agent pueda depender con condition: service_healthy antes de arrancar.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(3); sys.exit(0 if s.connect_ex(('localhost',8900))==0 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+
+  ooda-agent:
+    # Imagen oficial de registry (NO se construye desde este repo).
+    image: nousresearch/hermes-agent
+    # Arranque (modelo "perfil default"): recrea el perfil DEFAULT (/opt/data) copiando
+    # la plantilla declarativa del repo (bind-mount read-only en /opt/profile-src),
+    # inyecta la key del API server y arranca el gateway en foreground. 'hermes gateway
+    # run' mantiene el contenedor VIVO y arranca platforms.api_server (:8642 interno).
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        # El perfil DEFAULT es el home raíz /opt/data (no /opt/data/profiles/<p>).
+        DEF=/opt/data
+        # (a) copia la plantilla declarativa (config/SOUL/skills) al home del perfil default.
+        mkdir -p "$$DEF/skills"
+        cp /opt/profile-src/profile/config.yaml "$$DEF/config.yaml"
+        cp /opt/profile-src/profile/SOUL.md "$$DEF/SOUL.md"
+        cp -r /opt/profile-src/skills/. "$$DEF/skills/" 2>/dev/null || true
+        # (b) inyecta la KEY del API server (secreto, no se versiona) ANTES de arrancar.
+        hermes config set platforms.api_server.key "$$HERMES_API_SERVER_KEY" >/dev/null
+        # (c) arranca el gateway del perfil default: foreground (contenedor vivo) + API server.
+        exec hermes gateway run
+    environment:
+      # Clave del API server de Hermes — obligatoria (fail-closed): mín 8 chars. Hacen
+      # falta DOS vías: el command la escribe en platforms.api_server.key (arrancar el
+      # API server) y API_SERVER_KEY la valida en cada petición (autenticar el Bearer).
+      HERMES_API_SERVER_KEY: "${HERMES_API_SERVER_KEY:?Falta HERMES_API_SERVER_KEY - genera uno con 'openssl rand -hex 32' (min 8 chars) y ponlo en .env}"
+      API_SERVER_KEY: "${HERMES_API_SERVER_KEY}"
+      # API key del proveedor LLM de Hermes. Hermes lee la key del LLM de ESTA env var
+      # (OPENROUTER_API_KEY), por eso NO se declara HERMES_LLM_API_KEY. Obligatoria
+      # fail-closed: sin ella el agente no puede razonar.
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:?Falta OPENROUTER_API_KEY - define la API key de OpenRouter en .env}"
+    volumes:
+      # VOLUMEN CON NOMBRE OBLIGATORIO (nunca bind-mount): el state.db SQLite en modo WAL
+      # de Hermes SE CORROMPE en bind-mounts que cruzan la VM de macOS (virtiofs).
+      - hermes-data:/opt/data
+      # Plantilla declarativa del perfil, READ-ONLY y FUERA de /opt/data (no toca el WAL).
+      - ./agent-ooda:/opt/profile-src:ro
+    # TUI interactivo: 'docker compose exec -it ooda-agent hermes chat' necesita stdin+tty.
+    stdin_open: true
+    tty: true
+    # SIN sección ports: el API server de Hermes (:8642) NO se publica al host; solo es
+    # accesible por la red interna de docker.
+    depends_on:
+      # Espera a que kali esté healthy (MCP escuchando) antes de arrancar.
+      kali:
+        condition: service_healthy
+    restart: unless-stopped
+    # Red default del compose: alcanza kali:8900 por DNS interno de docker.
+
+volumes:
+  # Estado de Hermes (perfil + SQLite WAL). CON NOMBRE a propósito: evita el bind-mount
+  # que corrompe el SQLite WAL en virtiofs de macOS.
+  hermes-data:
