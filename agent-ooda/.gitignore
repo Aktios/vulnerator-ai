@@ -1,0 +1,4 @@
+# Nunca commitear secretos reales ni estado de perfil generado durante pruebas.
+.env
+*.local
+profiles/

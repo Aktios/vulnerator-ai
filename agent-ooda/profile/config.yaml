@@ -1,0 +1,123 @@
+# config.yaml — perfil Hermes del ejecutor OODA de hermes-pentest (OODA DIRECTO a Kali).
+# Vive en el home del perfil default de Hermes (/opt/data/config.yaml dentro del contenedor
+# ooda-agent; ver docker-compose.yml).
+#
+# DISENO: Hermes es CLIENTE del servidor MCP del contenedor `kali` (kali-mcp) y ejecuta las tools
+# de pentest DIRECTAMENTE sobre esa Kali. NO hay core/API/UI de PentAgent de por medio: no hay
+# gates (scope/consentimiento/intrusividad/audit/E4) ni contrato de 5 tools pentagent_*. La unica
+# via de Hermes al target es el MCP de `kali`, y la responsabilidad del alcance recae en el operador
+# (ver ADVERTENCIA del docker-compose.yml).
+#
+# VERIFICADO contra la doc oficial de Hermes:
+#   - mcp_servers (HTTP + tools.include/exclude + prompts/resources):
+#     https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/mcp.md
+#   - perfiles / config por perfil:
+#     https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/profiles.md
+
+# --- Modelo (proveedor LLM = OpenRouter) ------------------------------------
+# La key del LLM la lee Hermes de la variable de entorno OPENROUTER_API_KEY (NO HERMES_LLM_API_KEY):
+# el compose la inyecta tal cual en el proceso y Hermes la toma de ahi. SIN `hermes setup`
+# interactivo y SIN secreto en claro en el repo.
+model:
+  # mistral-large-4-0: modelo preparado para el encuadre ofensivo del pentest autorizado. Claude
+  # (anthropic/claude-sonnet-*) rechaza el encuadre ofensivo (el safety filter de OpenRouter/
+  # Anthropic devuelve "violative cyber content" y no responde). Mistral large no rehusa el pentest
+  # autorizado, por eso es el modelo del conductor OODA.
+  default: "mistralai/mistral-large-4-0"
+
+# --- El UNICO servidor MCP: la Kali (contenedor `kali`) ---------------------
+# Hermes es CLIENTE de este MCP. Es su UNICA via al target: ejecuta las tools de pentest DIRECTO
+# sobre la Kali. Sintaxis verificada en mcp.md (HTTP servers + Per-server filtering).
+#
+# NOMBRE DEL SERVER = `kali`. Hermes registra las tools MCP como `mcp_<server>_<tool>`, asi que las
+# tools efectivas son `mcp_kali_<tool>` (p. ej. `mcp_kali_kali_run`). El filtro `tools.include` se
+# aplica sobre el nombre del tool TAL COMO lo expone el servidor (`kali_run`, `iam_enum`, ...), no
+# sobre el nombre efectivo.
+mcp_servers:
+  kali:
+    # Endpoint del servidor kali-mcp (streamable-HTTP sobre `/`, red interna del compose). SIN
+    # headers ni token: el servidor kali-mcp no autentica; la seguridad del endpoint es el
+    # aislamiento de la red interna de docker.
+    url: "http://kali:8900"
+    tools:
+      # WHITELIST EXACTA (en orden) de las tools REALES del servidor kali-mcp, con el nombre TAL
+      # COMO lo expone el servidor. Nombre efectivo que vera el modelo = `mcp_kali_<tool>`.
+      #   OBSERVE : server_info, prowler_scan, iam_enum
+      #   ORIENT  : iam_simulate (AWS read-only), get_scan_status, read_tool_logs
+      #   ACT     : kali_run (bloqueante, una llamada) / kali_exec (async + poll)
+      include:
+        - kali_run
+        - kali_exec
+        - iam_enum
+        - iam_simulate
+        - get_scan_status
+        - read_tool_logs
+        - prowler_scan
+        - server_info
+      # Desactiva los wrappers de utilidad que Hermes anadiria (list_prompts/get_prompt,
+      # list_resources/read_resource). Verificado en mcp.md ("Filter utility tools too").
+      prompts: false
+      resources: false
+
+# --- Toolsets: SOLO el MCP de la Kali ---------------------------------------
+# OBJETIVO: que Hermes NO tenga mas herramientas que las del MCP de `kali` — nada de terminal/
+# code_execution/file/browser/web nativos (ensucian el razonamiento del bucle OODA).
+#
+# `toolsets:` es una LISTA de bundles (toolsets-reference.md), NO `toolsets.enabled` (esa llave no
+# existe y Hermes la ignora -> caeria al platform toolset por defecto `hermes-api-server`, que trae
+# file/terminal/web/browser/code_execution...). Cada servidor MCP genera un toolset dinamico
+# `mcp-<server>` (aqui `mcp-kali`), referenciable por el nombre del server (`kali`). Al listar SOLO
+# `kali`, la unica superficie son las tools del MCP de la Kali (ya filtradas por tools.include).
+toolsets:
+  - kali                 # unico toolset: el MCP de la Kali (dinamico `mcp-kali`). CERO tools nativas.
+
+# Defensa en profundidad (agent.disabled_toolsets, toolsets-reference.md): aunque `toolsets: [kali]`
+# ya excluye lo demas, se desactivan EXPLICITAMENTE los bundles nativos, por si un default de
+# plataforma los reintrodujera. Deben desaparecer del razonamiento del conductor OODA.
+agent:
+  disabled_toolsets:
+    - code_execution
+    - terminal
+    - file
+    - browser
+    - web
+    - search
+    - delegation
+    - computer_use
+    - memory
+    - skills
+
+# Progressive tool disclosure (Tool Search bridge): por defecto Hermes DIFIERE las tools MCP y
+# expone unos tools-puente (`tool_describe`/`tool_search`) para cargar su esquema bajo demanda, lo
+# que ensucia el log. Con pocas tools MCP no hace falta: lo DESACTIVAMOS para que Hermes vea las
+# tools de la Kali directamente (toolsets-reference.md / tool-search.md).
+tools:
+  tool_search:
+    enabled: false
+
+# --- Backend de terminal ----------------------------------------------------
+# Hermes NO usa terminal nativa (el toolset `terminal` esta desactivado arriba): ejecuta en la Kali
+# a traves del MCP (kali_run). Se deja `local` por si la imagen lo exige al arrancar. OJO: `local`
+# NO es sandbox (profiles.md).
+terminal:
+  backend: "local"
+
+# --- Memoria / aprendizaje --------------------------------------------------
+# Efimero por engagement: el perfil default se recrea en cada arranque copiando esta plantilla
+# declarativa (ver docker-compose.yml command), asi la memoria/skills aprendidas no se heredan entre
+# engagements aunque el volumen con nombre persista fisicamente.
+
+# --- Plataforma API server --------------------------------------------------
+# El API server OpenAI-compatible de Hermes (/v1/runs, /v1/runs/{id}/events, /health) permite
+# disparar y observar a Hermes por HTTP. VERIFICADO contra la imagen: hay que DECLARAR la plataforma
+# aqui (platforms.api_server) para que el gateway la arranque; no basta con las env vars. La `key`
+# NO se versiona: la inyecta el arranque (docker-compose command) desde HERMES_API_SERVER_KEY.
+platforms:
+  api_server:
+    enabled: true
+    host: "0.0.0.0"   # alcanzable por la red interna del compose
+    port: 8642        # NO publicado al host (sin ports: en el compose); solo red interna
+
+# --- Mensajeria / cron ------------------------------------------------------
+# NO conectar bots de mensajeria ni cron: la mensajeria es un vector de entrada no confiable. Solo
+# se declara la plataforma api_server de arriba.

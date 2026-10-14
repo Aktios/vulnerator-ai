@@ -1,0 +1,23 @@
+# config.yaml.example — variante documentada con placeholders.
+# Copia a config.yaml del perfil y ajusta si hace falta tras validar en vivo.
+# Sintaxis MCP verificada contra:
+#   https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/mcp.md
+
+model:
+  default: "mistralai/mistral-large-4-0"   # modelo de OpenRouter preparado para el pentest autorizado
+
+mcp_servers:
+  kali:
+    url: "http://kali:8900"                # el UNICO MCP: la Kali (contenedor `kali`). SIN headers/token.
+    tools:
+      # Whitelist de las tools reales del servidor kali-mcp (nombre tal como lo expone el servidor).
+      include: [kali_run, kali_exec, iam_enum, iam_simulate, get_scan_status, read_tool_logs, prowler_scan, server_info]
+      prompts: false
+      resources: false
+
+# Unico toolset: el MCP de la Kali (dinamico `mcp-kali`). CERO tools nativas.
+toolsets:
+  - kali
+
+terminal:
+  backend: "local"            # Hermes no usa terminal nativa; ejecuta en la Kali via kali_run.
