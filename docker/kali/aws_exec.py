@@ -1,25 +1,22 @@
-"""Runner AWS del foso OODA (STDLIB PURA) — construye y ejecuta el enum IAM.
+"""Runner AWS (STDLIB PURA) — construye y ejecuta el enum IAM read-only.
 
-Rol (architecture §1/§5): es la LÓGICA testeable del runner ``iam_enum`` que expone
-``kali_mcp_server`` como ``@mcp.tool`` SÍNCRONA. Igual que ``collector_runner`` /
-``tool_streaming``, vive en un módulo aparte que usa SOLO la librería estándar (sin
-``mcp``, sin ``boto3``) para poder cubrirse con tests unitarios en el venv de dev, donde
-ni el SDK ni boto3 están instalados.
+Es la LÓGICA testeable del runner ``iam_enum`` que expone ``kali_mcp_server`` como
+``@mcp.tool`` SÍNCRONA. Igual que ``collector_runner`` / ``tool_streaming``, vive en un
+módulo aparte que usa SOLO la librería estándar (sin ``mcp``, sin ``boto3``) para poder
+cubrirse con tests unitarios en el venv de dev, donde ni el SDK ni boto3 están instalados.
 
 Qué provee:
   - ``build_iam_enum_cmd(account_id, params, outfile)``: construye el argv (sin shell)
     ``[python3, aws_iam_enum.py, --account, <id>, --out, <outfile>]``. Valida ``account_id``
-    con forma de cuenta AWS (12 dígitos) y RECHAZA fail-closed lo mal formado (N-untrusted:
-    nunca se interpola entrada sin validar en un comando).
+    con forma de cuenta AWS (12 dígitos) y RECHAZA fail-closed lo mal formado (nunca se
+    interpola entrada sin validar en un comando).
   - ``run_iam_enum(account_id, params, execution_id, timeout)``: crea un tmpdir, construye
     el cmd, lo ejecuta con ``tool_streaming.run_tool_streaming`` (kill de grupo/timeout/logs
     al ring), lee el fichero de salida y devuelve ``{'status':'done',...,'output':<json-str>}``
     o ``{'status':'failed',...,'error':<diagnóstico>}``; limpia el tmpdir en ``finally``.
 
 Es SÍNCRONO de un solo tiro (a diferencia del collector async): el enum IAM acotado es
-corto y su JSON único lo stagea el EXECUTOR del core (decisión (c) del plan). Aquí NO se
-stagea artefacto ni se duplica ``KaliMcpClient``/``finalize_scan``: se devuelve el JSON
-crudo (``output``) y el core lo deposita en el plano de DATOS.
+corto y su JSON único viaja inline en ``output``; aquí NO se stagea artefacto.
 """
 
 from __future__ import annotations
@@ -110,8 +107,8 @@ def run_iam_enum(
     ring por ``execution_id``) -> lee el fichero de salida. Devuelve
     ``{'status':'done','returncode':rc,'output':<json-string>}`` si hay salida legible, o
     ``{'status':'failed','returncode':rc,'error':<diagnóstico con cola del ring>}`` en
-    timeout/sin salida. Limpia el tmpdir en ``finally``. El JSON crudo (``output``) lo
-    stagea el EXECUTOR del core (plano de DATOS); aquí NO se stagea.
+    timeout/sin salida. Limpia el tmpdir en ``finally``. El JSON crudo viaja inline en
+    ``output``; aquí NO se stagea artefacto.
     """
     try:
         account = _validate_account_id(account_id)
@@ -159,8 +156,7 @@ def run_iam_enum(
 def _read_output(outfile: str) -> str | None:
     """Lee el JSON de salida como texto crudo; ``None`` si no existe o está vacío.
 
-    No se interpreta el contenido (dato NO confiable): se devuelve verbatim para que el
-    executor del core lo stagee en el plano de DATOS.
+    No se interpreta el contenido (dato NO confiable): se devuelve verbatim.
     """
     path = Path(outfile)
     if not path.is_file():

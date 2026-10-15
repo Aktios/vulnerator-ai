@@ -1,11 +1,11 @@
-"""Tests stdlib-only del runner multi-herramienta genérico (`collector_runner.py`, N33).
+"""Tests stdlib-only del runner multi-herramienta genérico (`collector_runner.py`).
 
 Ejercitan la LÓGICA del runner SIN los binarios reales (prowler/scout/cloudsplaining):
   - los command builders producen el argv esperado por fuente;
   - los localizadores eligen el crudo correcto (JSON de ScoutSuite/Cloudsplaining, NUNCA
     el HTML);
   - la finalización stagea el crudo como artefacto y construye el `done` con la REFERENCIA
-    (sha256/size correctos); las fuentes no-Prowler NO populan el puente SSE (D6);
+    (sha256/size correctos); las fuentes no-Prowler NO populan el puente SSE;
   - Prowler sigue produciendo el mismo `done` que hoy (delegando en prowler_artifact);
   - ``run_collection`` orquesta end-to-end con un runner de subproceso simulado.
 """
@@ -75,7 +75,7 @@ def test_scoutsuite_locate_picks_results_js(tmp_path):
     outdir = tmp_path / "out"
     results = outdir / "scoutsuite-results"
     results.mkdir(parents=True)
-    (results / "scoutsuite_results_aws-pentagent.js").write_text("scoutsuite_results = {}", encoding="utf-8")
+    (results / "scoutsuite_results_aws-hermes.js").write_text("scoutsuite_results = {}", encoding="utf-8")
     (outdir / "report.html").write_text("<html></html>", encoding="utf-8")  # NO debe elegirse
     found = collector_runner._scoutsuite_locate(outdir)
     assert found is not None and found.suffix == ".js"
@@ -130,7 +130,7 @@ def test_finalize_scoutsuite_stages_artifact_and_done_ref_no_bridge(staging):
     outdir = staging / "out" / "scoutsuite-results"
     outdir.mkdir(parents=True)
     raw = b"scoutsuite_results =\n" + json.dumps({"services": {}}).encode("utf-8") + b";"
-    (outdir / "scoutsuite_results_aws-pentagent.js").write_bytes(raw)
+    (outdir / "scoutsuite_results_aws-hermes.js").write_bytes(raw)
 
     done = collector_runner.finalize(
         "scoutsuite", "exec-ss", staging / "out", 0, {"source": "scoutsuite"}
@@ -186,7 +186,7 @@ def test_finalize_prowler_matches_today_with_bridge(staging):
     assert done["findings_count"] == 3
     assert done["artifact"]["name"] == collector_runner.PROWLER_ARTIFACT_NAME
     assert "findings" not in done  # findings por referencia, no inline
-    # Prowler SÍ mantiene el puente SSE (compat N21).
+    # Prowler SÍ mantiene el puente SSE de compat.
     page = tool_streaming.read_findings("exec-pw", 0)
     assert [f["check_id"] for f in page["findings"]] == ["c0", "c1", "c2"]
 
@@ -220,7 +220,7 @@ def test_run_collection_scoutsuite_e2e(staging, monkeypatch):
     def _write(cmd):
         outdir = Path(cmd[cmd.index("--report-dir") + 1]) / "scoutsuite-results"
         outdir.mkdir(parents=True, exist_ok=True)
-        (outdir / "scoutsuite_results_aws-pentagent.js").write_bytes(raw)
+        (outdir / "scoutsuite_results_aws-hermes.js").write_bytes(raw)
 
     monkeypatch.setattr(
         collector_runner.tool_streaming, "run_tool_streaming", _fake_runner(_write)

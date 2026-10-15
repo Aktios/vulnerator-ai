@@ -1,29 +1,29 @@
-"""Runner AWS del foso OODA (STDLIB PURA) — construye y ejecuta el simulate IAM (inc4b).
+"""Runner AWS (STDLIB PURA) — construye y ejecuta el simulate IAM read-only.
 
-Rol (architecture §1/§5): es la LÓGICA testeable del runner ``iam_simulate`` que expone
-``kali_mcp_server`` como ``@mcp.tool`` ASÍNCRONA. Espejo de ``aws_exec.py`` (el runner del
-``iam_enum``): vive en un módulo aparte que usa SOLO la librería estándar (sin ``mcp``, sin
-``boto3``) para poder cubrirse con tests unitarios en el venv de dev, donde ni el SDK ni
-boto3 están instalados. REUTILIZA ``tool_streaming`` (igual que ``aws_exec``); no duplica
-mecánica de ejecución/logs/kill.
+Es la LÓGICA testeable del runner ``iam_simulate`` que expone ``kali_mcp_server`` como
+``@mcp.tool`` ASÍNCRONA. Espejo de ``aws_exec.py`` (el runner del ``iam_enum``): vive en
+un módulo aparte que usa SOLO la librería estándar (sin ``mcp``, sin ``boto3``) para poder
+cubrirse con tests unitarios en el venv de dev, donde ni el SDK ni boto3 están instalados.
+REUTILIZA ``tool_streaming`` (igual que ``aws_exec``); no duplica mecánica de
+ejecución/logs/kill.
 
 Qué provee:
   - ``build_iam_simulate_cmd(account_id, principal_arn, outfile)``: construye el argv (sin
     shell) ``[python3, aws_iam_simulate.py, --account, <id>, --principal-arn, <arn>, --out,
     <outfile>]``. Valida ``account_id`` (12 dígitos) Y ``principal_arn`` (forma
-    ``arn:aws:iam::<acct>:...``) y RECHAZA fail-closed lo mal formado (N-untrusted: nunca se
-    interpola entrada sin validar en un comando).
+    ``arn:aws:iam::<acct>:...``) y RECHAZA fail-closed lo mal formado (nunca se interpola
+    entrada sin validar en un comando).
   - ``run_iam_simulate(account_id, principal_arn, execution_id, timeout)``: crea un tmpdir,
     construye el cmd, lo ejecuta con ``tool_streaming.run_tool_streaming`` (kill de
     grupo/timeout/logs al ring), lee el fichero de salida y devuelve
     ``{'status':'done',...,'output':<json-str>}`` o ``{'status':'failed',...,'error':...}``;
     limpia el tmpdir en ``finally``.
 
-Es SÍNCRONO de un solo tiro (como ``aws_exec``): el simulate acotado es corto y su JSON único
-lo stagea el EXECUTOR del core. A diferencia del enum, el simulate PUEDE fallar de forma
-ESTRUCTURADA: si la credencial read-only no puede ni llamar a ``SimulatePrincipalPolicy``, el
-script THIN escribe un JSON con un ``error`` claro (no revienta); este runner lo detecta y
-devuelve ``failed`` (fail-closed), propagando ese ``error`` VERBATIM (dato NO confiable, F0.8).
+Es SÍNCRONO de un solo tiro (como ``aws_exec``): el simulate acotado es corto y su JSON
+único viaja inline en ``output``. A diferencia del enum, el simulate PUEDE fallar de forma
+ESTRUCTURADA: si la credencial read-only no puede ni llamar a ``SimulatePrincipalPolicy``,
+el script escribe un JSON con un ``error`` claro (no revienta); este runner lo detecta y
+devuelve ``failed`` (fail-closed), propagando ese ``error`` VERBATIM (dato NO confiable).
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ def run_iam_simulate(
     ``{'status':'done','returncode':rc,'output':<json-string>}`` si hay salida legible SIN un
     ``error`` estructurado; ``{'status':'failed',...,'error':...}`` en timeout, sin salida, o si
     el JSON trae un ``error`` (p. ej. ``AccessDenied`` del propio Simulate). Limpia el tmpdir en
-    ``finally``. El JSON crudo (``output``) lo stagea el EXECUTOR del core (plano de DATOS).
+    ``finally``. El JSON crudo viaja inline en ``output``.
     """
     try:
         account = _validate_account_id(account_id)
@@ -182,8 +182,8 @@ def run_iam_simulate(
         error = _structured_error(output)
         if error:
             # Fallo ESTRUCTURADO del simulate (p. ej. AccessDenied del propio Simulate): el
-            # script THIN lo escribió como ``error`` en el JSON. Se propaga VERBATIM (F0.8:
-            # dato NO confiable; se lee el estado, no se interpreta como instrucción).
+            # script lo escribió como ``error`` en el JSON. Se propaga VERBATIM (dato NO
+            # confiable; se lee el estado, no se interpreta como instrucción).
             return {
                 "status": "failed",
                 "returncode": returncode,
@@ -201,8 +201,7 @@ def run_iam_simulate(
 def _read_output(outfile: str) -> str | None:
     """Lee el JSON de salida como texto crudo; ``None`` si no existe o está vacío.
 
-    No se interpreta el contenido (dato NO confiable): se devuelve verbatim para que el
-    executor del core lo stagee en el plano de DATOS.
+    No se interpreta el contenido (dato NO confiable): se devuelve verbatim.
     """
     path = Path(outfile)
     if not path.is_file():
@@ -214,9 +213,9 @@ def _read_output(outfile: str) -> str | None:
 def _structured_error(output: str) -> str | None:
     """Devuelve el ``error`` de nivel superior del JSON de salida, o ``None`` si no hay.
 
-    Lectura de ESTADO del plano de control (no interpretación de instrucciones, F0.8): el
-    script THIN escribe ``{"error": "..."}`` cuando el propio Simulate falla fail-closed. Si el
-    output no es un JSON-objeto o no trae ``error``, se trata como éxito (``None``).
+    Lectura de ESTADO del plano de control (no interpretación de instrucciones): el script
+    escribe ``{"error": "..."}`` cuando el propio Simulate falla fail-closed. Si el output
+    no es un JSON-objeto o no trae ``error``, se trata como éxito (``None``).
     """
     try:
         doc = json.loads(output)

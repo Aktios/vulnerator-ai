@@ -1,4 +1,4 @@
-"""Tests stdlib-only del runner AWS del foso (`aws_exec.py`, F2 FEAT-002).
+"""Tests stdlib-only del runner AWS del enum (`aws_exec.py`).
 
 Ejercitan la LÓGICA del runner SIN boto3 ni el script real (``aws_iam_enum.py`` no se
 importa: boto3 no está en el venv de dev). Fijan que:
@@ -77,7 +77,7 @@ def test_run_iam_enum_done_with_readable_output(monkeypatch):
     result = aws_exec.run_iam_enum("123456789012", "", "exec-ok")
     assert result["status"] == "done"
     assert result["returncode"] == 0
-    # El 'output' es el JSON crudo verbatim (lo stagea el executor del core, no aquí).
+    # El 'output' es el JSON crudo verbatim (viaja inline, no se stagea aquí).
     assert json.loads(result["output"]) == document
 
 

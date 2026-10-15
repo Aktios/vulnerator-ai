@@ -1,30 +1,20 @@
-"""Servidor `kali-mcp` de PentAgent — runtime determinista de tools en Kali.
+"""Servidor `kali-mcp` — runtime determinista de tools de pentest en Kali.
 
-Rol MCP (design.md "Doble rol MCP"):
-  - Este proceso es el SERVIDOR `kali-mcp` que corre DENTRO del contenedor Kali.
-    PentAgent (pentagent-core) lo consume como CLIENTE MCP vía `KALI_MCP_URL`.
-  - NO es el servidor MCP que PentAgent *expone* a asistentes externos (ese vive
-    en la API). No confundir.
+Este proceso es el SERVIDOR MCP que corre DENTRO del contenedor Kali. Hermes lo
+consume como CLIENTE MCP vía su URL (`http://kali:8900`) y es su única vía al target.
 
-Decisión de implementación (documentada — N12.4):
-  Los servidores `kali-mcp` open-source existentes son puentes genéricos de
-  "ejecuta cualquier comando en una terminal". Eso choca con la disciplina del
-  MVP (R3/R4, scope-notes N2): la recolección v1 es *read-only*, determinista y
-  acotada a Prowler; NO se expone ejecución de comandos arbitrarios. Por eso se
-  implementa aquí un servidor MCP MÍNIMO sobre el SDK oficial `mcp` (FastMCP,
-  transporte streamable-HTTP) que expone EXACTAMENTE la tool que el cliente de
-  pentagent-core espera (`prowler_scan`) y una tool de información segura para el
-  smoke test. Esto mantiene la frontera y encaja 1:1 con `KaliMcpClient` sin tocar
-  los contratos.
+Expone un conjunto acotado de tools sobre el SDK oficial `mcp` (FastMCP, transporte
+streamable-HTTP): recolección cloud read-only (Prowler/ScoutSuite/Cloudsplaining),
+enum/simulate IAM read-only, shell cruda (`kali_run`/`kali_exec`) y utilidades de
+sondeo/lectura de salida. La shell cruda da al bucle OODA una Kali completa.
 
 Transporte: streamable-HTTP en `0.0.0.0:$KALI_MCP_PORT` (8900 por defecto), con el
 endpoint MCP montado en la raíz (`/`) para que el cliente alcance el servidor por
-`KALI_MCP_URL=http://kali:8900` sin configurar un path.
+`http://kali:8900` sin configurar un path.
 
-Disciplina arm64 (R3.2/R3.3, design.md 4.4): si Prowler no está disponible en esta
-arquitectura, la tool `prowler_scan` NO finge: devuelve un error claro. El smoke
-test (listar tools + `server_info`) refleja el estado real; la ausencia de una tool
-esperada la detecta el cliente (`EXPECTED_TOOLS`).
+Disciplina arm64: si una herramienta no está disponible en esta arquitectura, su tool
+NO finge: devuelve un error claro. `server_info` refleja el estado real (qué binarios
+hay presentes), de modo que la ausencia de una tool esperada es detectable por el cliente.
 """
 
 from __future__ import annotations
@@ -41,21 +31,20 @@ from typing import Any
 # cubre con tests unitarios sin el SDK (ver docker/kali/tests/).
 import tool_streaming
 
-# Runner multi-herramienta genérico (N33), STDLIB PURA: registro por fuente
+# Runner multi-herramienta genérico, STDLIB PURA: registro por fuente
 # (prowler/scoutsuite/cloudsplaining) + worker/finalize únicos. `prowler_scan` y
 # `start_collection` delegan aquí (una ruta, no una copia por tool). A su vez reutiliza
 # `prowler_artifact` (stage + puente SSE) para la fuente Prowler y `artifact_store`.
 import collector_runner
 
-# Runner AWS del foso OODA (F2), STDLIB PURA (sin `mcp`/`boto3`): construye y ejecuta el
-# enum IAM read-only acotado (build_iam_enum_cmd + run_iam_enum) reutilizando
-# `tool_streaming`. La tool `iam_enum` lanza este worker EN BACKGROUND (igual que las
-# colecciones) y el cliente sondea con `get_scan_status`; su JSON crudo lo stagea el
-# executor del core (plano de DATOS), por eso aquí NO se stagea.
+# Runner AWS, STDLIB PURA (sin `mcp`/`boto3`): construye y ejecuta el enum IAM read-only
+# acotado (build_iam_enum_cmd + run_iam_enum) reutilizando `tool_streaming`. La tool
+# `iam_enum` lanza este worker EN BACKGROUND (igual que las colecciones) y el cliente
+# sondea con `get_scan_status`.
 import aws_exec
 
-# Runner AWS del foso OODA (inc4b), STDLIB PURA (sin `mcp`/`boto3`): construye y ejecuta el
-# simulate IAM read-only per-principal (build_iam_simulate_cmd + run_iam_simulate) reutilizando
+# Runner AWS, STDLIB PURA (sin `mcp`/`boto3`): construye y ejecuta el simulate IAM
+# read-only per-principal (build_iam_simulate_cmd + run_iam_simulate) reutilizando
 # `tool_streaming`. Espejo de `aws_exec` para la tool `iam_simulate` (misma mecánica async).
 import aws_simulate
 
@@ -63,18 +52,24 @@ import aws_simulate
 # Kali vía `sh -c` reutilizando `tool_streaming` (kill de grupo/timeout/logs al ring).
 # La tool `kali_exec` lanza este worker EN BACKGROUND (igual que iam_enum) y el cliente
 # sondea con `get_scan_status` + `read_tool_logs`. Da al bucle OODA una Kali completa
-# (encadenar, pipes, scripts propios, cualquier tool instalada). La AUTORIZACIÓN (scope/
-# consentimiento/audit) la aplica el CORE ANTES de invocar; aquí solo se EJECUTA.
+# (encadenar, pipes, scripts propios, cualquier tool instalada). Aquí solo se EJECUTA:
+# no hay gate de autorización (es responsabilidad del operador).
 import shell_exec
 
-# Plano de DATOS (N23), STDLIB PURA (sin `mcp`/`anyio`): servidor HTTP que SIRVE los
-# artefactos staged al core por stream. (El staging/finalización vive en
-# `collector_runner`/`prowler_artifact`, que `collector_runner` importa.)
+# Store de hallazgos por engagement (STDLIB PURA): append estructurado a un JSONL sobre
+# el plano de artefactos (``/artifacts``). Las tools `record_finding`/`read_findings` son
+# una capa fina sobre ``finding_store.append``/``read``. Es el registro durable del que
+# tiran el handoff y el `pentest-report`, en vez de reconstruir desde la conversación.
+import finding_store
+
+# Plano de DATOS, STDLIB PURA (sin `mcp`/`anyio`): servidor HTTP que SIRVE los artefactos
+# staged por stream. (El staging/finalización vive en `collector_runner`/`prowler_artifact`,
+# que `collector_runner` importa.)
 import artifact_http
 
-# SDK `mcp`: la imagen Kali fija `mcp<2` (1.x `FastMCP`, ver
-# docker/kali/requirements.txt) a propósito, para hablar la MISMA era de protocolo
-# que el cliente de pentagent-core. Este servidor usa la API 1.x `FastMCP`.
+# SDK `mcp`: la imagen Kali fija `mcp<2` (1.x `FastMCP`, ver docker/kali/requirements.txt)
+# a propósito, para hablar la MISMA era de protocolo con los clientes. Este servidor usa
+# la API 1.x `FastMCP`.
 from mcp.server.fastmcp import FastMCP
 
 # --- Configuración por entorno (overridable; defaults seguros) ---------------
@@ -83,73 +78,60 @@ PORT = int(os.environ.get("KALI_MCP_PORT", "8900"))
 # Timeout de un escaneo Prowler (segundos). Evita colgar el servidor indefinidamente.
 PROWLER_TIMEOUT = int(os.environ.get("PROWLER_TIMEOUT", "900"))
 
-# Plano de DATOS (N23): el servidor HTTP de artefactos escucha en su propio puerto
-# (DEDICADO, distinto del MCP 8900), sólo en la red interna docker (NO publicado al
-# host). El token compartido es OBLIGATORIO (fail-closed): sin él no se arranca el
-# canal de datos y el core cae al puente `read_scan_findings`.
+# El servidor HTTP de artefactos escucha en su propio puerto (DEDICADO, distinto del MCP
+# 8900), sólo en la red interna docker (NO publicado al host). Si no hay token compartido,
+# el canal de datos no se arranca (fail-closed) y los findings se sirven por el puente
+# `read_scan_findings`.
 ARTIFACTS_HOST = os.environ.get("KALI_ARTIFACTS_HOST", "0.0.0.0")
 ARTIFACTS_PORT = int(os.environ.get("KALI_ARTIFACTS_PORT", "8901"))
 ARTIFACTS_TOKEN = os.environ.get("KALI_ARTIFACTS_TOKEN", "")
 
-# Nombre de la tool que el cliente de pentagent-core espera (PROWLER_TOOL_NAME).
-# Si cambia aquí, cambia en packages/.../tools/kali_mcp.py (único punto de acople).
+# Tool de recolección cloud Prowler (alias de delegación de `start_collection`).
 PROWLER_TOOL_NAME = "prowler_scan"
 
-# Tool multi-herramienta (N33): lanza en vivo prowler/scoutsuite/cloudsplaining bajo el
-# MISMO contrato no-bloqueante. `prowler_scan` queda como alias de delegación (compat).
-# Si cambia aquí, cambia en packages/.../tools/kali_mcp.py (único punto de acople).
+# Tool multi-herramienta: lanza en vivo prowler/scoutsuite/cloudsplaining bajo el MISMO
+# contrato no-bloqueante. `prowler_scan` queda como alias de delegación.
 START_COLLECTION_TOOL_NAME = "start_collection"
 
-# Tool genérica de lectura incremental de logs de cualquier ejecución (verbose en
-# vivo). La consume FEAT-002 (API/UI) para mostrar la salida de Kali en directo.
+# Tool genérica de lectura incremental de logs de cualquier ejecución (verbose en vivo).
 READ_LOGS_TOOL_NAME = "read_tool_logs"
 
-# Tool de sondeo del estado de un escaneo lanzado en background por `prowler_scan`.
-# La consume FEAT-002 para resolver el flujo no-bloqueante (started -> running ->
+# Tool de sondeo del estado de una ejecución lanzada en background (started -> running ->
 # done/failed) por execution_id.
 SCAN_STATUS_TOOL_NAME = "get_scan_status"
 
 # Tool de lectura PAGINADA de los findings de un escaneo terminado. Existe para no
 # superar el límite de 1 MiB de un único evento SSE del transporte streamable-http:
 # `get_scan_status` al `done` ya NO lleva los findings inline (sólo `findings_count`)
-# y el cliente los recupera por páginas con esta tool (mismo patrón cursor que los
-# logs). La consume el core (kali<->core); no se expone en el servidor MCP público.
+# y el cliente los recupera por páginas con esta tool (mismo patrón cursor que los logs).
 READ_FINDINGS_TOOL_NAME = "read_scan_findings"
 
-# Tool interna kali<->core que CANCELA un escaneo en curso (N22.2): mata el grupo de
-# proceso por execution_id reutilizando el kill existente de tool_streaming. La invoca
-# el core (CoreServices.cancel_phase); NO se expone en el servidor MCP público.
+# Tool que CANCELA un escaneo en curso: mata el grupo de proceso por execution_id
+# reutilizando el kill existente de tool_streaming.
 CANCEL_SCAN_TOOL_NAME = "cancel_scan"
 
-# Tool del runner AWS del foso OODA (F2): enum IAM read-only acotado, NO BLOQUEANTE (igual
-# que las colecciones): lanza el enum en background por `execution_id` y devuelve en <2s
-# con `{'execution_id','status':'started'}`; el cliente sondea con `get_scan_status` y lee
-# la salida en vivo con `read_tool_logs`. Así el enum (p. ej. 153 roles) NO retiene el hilo
-# de petición ni tumba el healthcheck del servidor. Al `done`, el JSON crudo del enum viaja
-# inline en `output` (puente F2 ya registrado; stage-on-kali es F4) y lo stagea el executor
-# del core (plano de DATOS). ACTIVE_SAFE: el gate de intrusividad del bucle OODA la autoriza
-# (registro 'aws-exec' en config/mcp-servers.yaml).
+# Tool de enum IAM read-only acotado, NO BLOQUEANTE (igual que las colecciones): lanza el
+# enum en background por `execution_id` y devuelve en <2s con
+# `{'execution_id','status':'started'}`; el cliente sondea con `get_scan_status` y lee la
+# salida en vivo con `read_tool_logs`. Así el enum (p. ej. 153 roles) NO retiene el hilo de
+# petición ni tumba el healthcheck del servidor. Al `done`, el JSON crudo del enum viaja
+# inline en `output`.
 IAM_ENUM_TOOL_NAME = "iam_enum"
 
-# Tool del runner AWS del foso OODA (inc4b): simulate IAM read-only PER-PRINCIPAL. Dado el ARN
-# de un principal de un candidato alcanzable, usa `iam:SimulatePrincipalPolicy` (API AWS
-# READ-ONLY: NO modifica estado) para comprobar si ese principal PUEDE ejecutar un conjunto fijo
-# de acciones de privesc clásicas. NO BLOQUEANTE EXACTAMENTE como `iam_enum`: lanza el worker en
-# background por `execution_id` y devuelve en <2s con `{'execution_id','status':'started'}`; el
-# cliente sondea con `get_scan_status` y lee la salida en vivo con `read_tool_logs`. Al `done`,
-# el JSON crudo del simulate viaja inline en `output` (mismo puente que el enum) y lo stagea el
-# executor del core (plano de DATOS). ACTIVE_SAFE: read-only pero acción activa contra AWS, mismo
-# nivel que `iam_enum` (registro 'aws-exec' en config/mcp-servers.yaml).
+# Tool de simulate IAM read-only PER-PRINCIPAL: dado el ARN de un principal, usa
+# `iam:SimulatePrincipalPolicy` (API AWS READ-ONLY: NO modifica estado) para comprobar si
+# ese principal PUEDE ejecutar un conjunto fijo de acciones de privesc clásicas. NO
+# BLOQUEANTE EXACTAMENTE como `iam_enum`: lanza el worker en background por `execution_id`
+# y devuelve en <2s; el cliente sondea con `get_scan_status` y lee la salida en vivo con
+# `read_tool_logs`. Al `done`, el JSON crudo del simulate viaja inline en `output`.
 IAM_SIMULATE_TOOL_NAME = "iam_simulate"
 
 # Tool de SHELL CRUDA de la Kali (decisión del operador): ejecuta un comando arbitrario
 # vía `sh -c` en el contenedor Kali. A diferencia de los runners deterministas/acotados
 # (iam_enum/iam_simulate/prowler), NO restringe el comando: da al bucle OODA una Kali
 # completa (herramientas instaladas, pipes, scripts propios). NO BLOQUEANTE como los
-# demás runners (background + poll). INTRUSIVE: la ejecución de comandos arbitrarios es
-# potencialmente intrusiva/destructiva, así que su registro MCP (config/mcp-servers.yaml)
-# va a un nivel que el gate de intrusividad del core gobierna; el scope/consentimiento/
-# audit los aplica el CORE ANTES de invocar, no esta tool.
+# demás runners (background + poll). La ejecución de comandos arbitrarios es potencialmente
+# intrusiva/destructiva; no hay gate de autorización previo (es responsabilidad del operador).
 KALI_EXEC_TOOL_NAME = "kali_exec"
 
 # Variante BLOQUEANTE de la shell cruda para el OODA conducido por LLM: a diferencia de
@@ -157,9 +139,17 @@ KALI_EXEC_TOOL_NAME = "kali_exec"
 # DEVUELVE la salida completa en UNA sola llamada (con timeout). Pensada para que Hermes
 # la use como una tool normal sin tener que orquestar el patrón started->poll->read.
 # Comparte el MISMO runner (`shell_exec.run_shell`): NO duplica lógica, solo cambia la
-# forma de entrega (bloqueante vs background). ADVERTENCIA HONESTA: este producto NO tiene
-# core; NO hay gates de scope/consentimiento/audit antes de ejecutar.
+# forma de entrega (bloqueante vs background). ADVERTENCIA HONESTA: no hay gate de
+# scope/consentimiento/audit antes de ejecutar.
 KALI_RUN_TOOL_NAME = "kali_run"
+
+# Tools del store de hallazgos por engagement: `record_finding` hace append estructurado
+# de un hallazgo al JSONL del engagement (plano de artefactos), y `read_findings` lo lee
+# paginado. Dan al bucle OODA un registro durable y consultable de qué se observó, se
+# intentó y se confirmó, que sobrevive a la naturaleza efímera del perfil. Lo alimenta el
+# conductor a lo largo del bucle; de él tiran el handoff y el `pentest-report`.
+RECORD_FINDING_TOOL_NAME = "record_finding"
+READ_FINDINGS_STORE_TOOL_NAME = "read_findings"
 
 # El endpoint MCP se monta en la raíz para que KALI_MCP_URL=http://kali:8900
 # (sin path) funcione tal cual con el cliente (streamable-HTTP del SDK oficial).
@@ -169,14 +159,14 @@ mcp = FastMCP("kali-mcp", host=HOST, port=PORT, streamable_http_path="/")
 def _prowler_binary() -> str | None:
     """Devuelve la ruta del binario `prowler` si está disponible, o None.
 
-    No se finge disponibilidad (design.md 4.4): si no está, quien llame lo reporta.
+    No se finge disponibilidad: si no está, quien llame lo reporta.
     """
     return shutil.which("prowler")
 
 
 @mcp.tool()
 def server_info() -> dict[str, Any]:
-    """Operación SEGURA y NO intrusiva para el smoke test (R3.2).
+    """Operación SEGURA y NO intrusiva para el smoke test.
 
     No toca AWS ni ejecuta herramientas: solo informa del estado del runtime
     (arquitectura, si Prowler está presente y su versión). El cliente usa el
@@ -197,8 +187,7 @@ def server_info() -> dict[str, Any]:
         except Exception:  # noqa: BLE001 - informativo, no fatal
             version = None
     # Disponibilidad REAL por collector (which de prowler/scout/cloudsplaining); no se
-    # finge en arm64 (R3.2/4.4): lo que no esté se reporta ausente y su collection falla
-    # claro en el core.
+    # finge en arm64: lo que no esté se reporta ausente y su collection falla claro.
     collectors = collector_runner.available_collectors()
     return {
         "server": "kali-mcp",
@@ -217,6 +206,8 @@ def server_info() -> dict[str, Any]:
             IAM_SIMULATE_TOOL_NAME,
             KALI_EXEC_TOOL_NAME,
             KALI_RUN_TOOL_NAME,
+            RECORD_FINDING_TOOL_NAME,
+            READ_FINDINGS_STORE_TOOL_NAME,
             "server_info",
         ],
     }
@@ -273,7 +264,7 @@ def read_scan_findings(
 def _start_collection_background(
     source: str, account_id: str, params: str, execution_id: str
 ) -> dict[str, Any]:
-    """Arranca una collection EN VIVO en background y devuelve de inmediato (N33).
+    """Arranca una collection EN VIVO en background y devuelve de inmediato.
 
     Lógica compartida por ``start_collection`` y el alias ``prowler_scan``: genera un
     ``execution_id`` si falta, lanza el worker genérico del ``collector_runner`` en un hilo
@@ -302,13 +293,12 @@ def start_collection(
     params: str = "",
     execution_id: str = "",
 ) -> dict[str, Any]:
-    """Arranca una collection EN VIVO con la tool elegida (read-only) y DEVUELVE ya (N33).
+    """Arranca una collection EN VIVO con la tool elegida (read-only) y DEVUELVE ya.
 
     Multi-herramienta bajo el MISMO contrato no-bloqueante que ``prowler_scan``: ``source``
     ∈ {prowler, scoutsuite, cloudsplaining}. Determinista (corre el binario real, NO el
-    LLM); credenciales AWS read-only del entorno del contenedor; el scope ya lo valida
-    PentAgent (scope-guard fail-closed) ANTES de llamar. El escaneo corre en background
-    (``execution_id``); el cliente sondea con ``get_scan_status`` y lee logs con
+    LLM); credenciales AWS read-only del entorno del contenedor. El escaneo corre en
+    background (``execution_id``); el cliente sondea con ``get_scan_status`` y lee logs con
     ``read_tool_logs``. El crudo se deposita en la capa de artefactos (plano de DATOS); el
     ``done`` sólo lleva la REFERENCIA. Si la tool no está disponible en esta arquitectura,
     la ejecución termina en ``failed`` con el motivo (no se finge).
@@ -351,9 +341,9 @@ def get_scan_status(execution_id: str) -> dict[str, Any]:
       - {'status':'done','returncode':int,'timed_out':False,'findings_count':int,
         'artifact':{execution_id,name,size,sha256,findings_count}} al OK. Los findings
         NO viajan inline (reventaría el límite de 1 MiB del evento SSE con datos
-        reales): el core baja el artefacto CRUDO por el plano de DATOS (HTTP chunked)
-        usando la REFERENCIA `artifact`. Puente de compat (N21): si no hay `artifact`
-        (staging falló o kali antigua) se recuperan paginados con `read_scan_findings`.
+        reales): el cliente baja el artefacto CRUDO por el plano de DATOS (HTTP chunked)
+        usando la REFERENCIA `artifact`. Puente de compat: si no hay `artifact`
+        (staging falló) se recuperan paginados con `read_scan_findings`.
       - {'status':'failed','returncode'?:int,'timed_out'?:bool,'error':str} si falla
         el worker o hay timeout.
       - {'status':'unknown'} si el execution_id no existe (no revienta).
@@ -365,12 +355,11 @@ def get_scan_status(execution_id: str) -> dict[str, Any]:
 
 @mcp.tool(name=CANCEL_SCAN_TOOL_NAME)
 def cancel_scan(execution_id: str) -> dict[str, Any]:
-    """Cancela un escaneo en curso lanzado por `prowler_scan` (N22.2).
+    """Cancela un escaneo en curso lanzado por `prowler_scan`.
 
     Mata el GRUPO de procesos del escaneo por `execution_id` (reutiliza el kill
-    SIGTERM->SIGKILL ya existente, sin huérfanos — N18.3) y marca la cancelación. Es
-    una tool interna kali<->core: la invoca el core (CoreServices.cancel_phase) cuando
-    el usuario para una fase; NO ejecuta nada contra AWS.
+    SIGTERM->SIGKILL ya existente, sin huérfanos) y marca la cancelación. NO ejecuta
+    nada contra AWS.
 
     Returns:
         {'execution_id': str, 'status': 'cancelling'|'not_running'}. 'cancelling' si
@@ -389,20 +378,17 @@ def cancel_scan(execution_id: str) -> dict[str, Any]:
 def iam_enum(
     account_id: str, params: str = "", execution_id: str = ""
 ) -> dict[str, Any]:
-    """Enum IAM read-only ACOTADO de la cuenta AWS autorizada (runner del foso, F2).
+    """Enum IAM read-only ACOTADO de la cuenta AWS autorizada.
 
-    Tool del bucle OODA (ACTIVE_SAFE; el gate de intrusividad del core la autoriza, no se
-    autoriza a sí misma): el scope ya lo validó PentAgent ANTES de llamar. Es NO BLOQUEANTE,
-    EXACTAMENTE como ``start_collection``: lanza ``aws_exec.run_iam_enum`` en un hilo demonio
-    con ``tool_streaming.start_background`` y DEVUELVE en <2s con
-    ``{'execution_id','status':'started'}``; así el enum (p. ej. 153 roles) NO retiene el
-    hilo de petición del servidor ni impide responder el healthcheck. El cliente sondea con
-    ``get_scan_status`` (devuelve el dict terminal del worker) y lee la salida en vivo con
-    ``read_tool_logs`` (ambas por ``execution_id``). El worker valida ``account_id``
-    fail-closed, ejecuta ``aws_iam_enum.py`` con streaming de logs y kill de grupo/timeout
-    (``tool_streaming``) y lee la salida de FICHERO; su documento único (el JSON crudo del
-    enum, inline en ``output``) lo stagea el EXECUTOR del core en el plano de DATOS, por eso
-    aquí NO se stagea artefacto.
+    Tool del bucle OODA. Es NO BLOQUEANTE, EXACTAMENTE como ``start_collection``: lanza
+    ``aws_exec.run_iam_enum`` en un hilo demonio con ``tool_streaming.start_background`` y
+    DEVUELVE en <2s con ``{'execution_id','status':'started'}``; así el enum (p. ej. 153
+    roles) NO retiene el hilo de petición del servidor ni impide responder el healthcheck.
+    El cliente sondea con ``get_scan_status`` (devuelve el dict terminal del worker) y lee
+    la salida en vivo con ``read_tool_logs`` (ambas por ``execution_id``). El worker valida
+    ``account_id`` fail-closed, ejecuta ``aws_iam_enum.py`` con streaming de logs y kill de
+    grupo/timeout (``tool_streaming``) y lee la salida de FICHERO; el JSON crudo del enum
+    viaja inline en ``output``.
 
     READ-ONLY: ``aws_iam_enum.py`` solo usa ``list_*``/``get_*``; NUNCA cambia estado AWS.
 
@@ -433,22 +419,20 @@ def iam_enum(
 def iam_simulate(
     account_id: str, principal_arn: str, execution_id: str = ""
 ) -> dict[str, Any]:
-    """Simula permisos efectivos de privesc de un principal IAM (runner del foso, inc4b).
+    """Simula permisos efectivos de privesc de un principal IAM.
 
-    Tool del bucle OODA (ACTIVE_SAFE; el gate de intrusividad del core la autoriza, no se
-    autoriza a sí misma): el scope ya lo validó PentAgent ANTES de llamar. Dado el ARN de un
-    principal de un candidato alcanzable, usa ``iam:SimulatePrincipalPolicy`` (API AWS
-    READ-ONLY: NO modifica estado) para comprobar si ese principal PUEDE ejecutar un conjunto
-    FIJO de acciones de privesc clásicas. Es NO BLOQUEANTE, EXACTAMENTE como ``iam_enum``: lanza
-    ``aws_simulate.run_iam_simulate`` en un hilo demonio con ``tool_streaming.start_background``
-    y DEVUELVE en <2s con ``{'execution_id','status':'started'}``; así no retiene el hilo de
-    petición del servidor ni impide responder el healthcheck. El cliente sondea con
-    ``get_scan_status`` (devuelve el dict terminal del worker) y lee la salida en vivo con
-    ``read_tool_logs`` (ambas por ``execution_id``). El worker valida ``account_id`` Y
-    ``principal_arn`` fail-closed, ejecuta ``aws_iam_simulate.py`` con streaming de logs y kill
-    de grupo/timeout (``tool_streaming``) y lee la salida de FICHERO; su documento único (el JSON
-    crudo del simulate, inline en ``output``) lo stagea el EXECUTOR del core en el plano de
-    DATOS, por eso aquí NO se stagea artefacto.
+    Tool del bucle OODA. Dado el ARN de un principal de un candidato alcanzable, usa
+    ``iam:SimulatePrincipalPolicy`` (API AWS READ-ONLY: NO modifica estado) para comprobar
+    si ese principal PUEDE ejecutar un conjunto FIJO de acciones de privesc clásicas. Es NO
+    BLOQUEANTE, EXACTAMENTE como ``iam_enum``: lanza ``aws_simulate.run_iam_simulate`` en un
+    hilo demonio con ``tool_streaming.start_background`` y DEVUELVE en <2s con
+    ``{'execution_id','status':'started'}``; así no retiene el hilo de petición del servidor
+    ni impide responder el healthcheck. El cliente sondea con ``get_scan_status`` (devuelve
+    el dict terminal del worker) y lee la salida en vivo con ``read_tool_logs`` (ambas por
+    ``execution_id``). El worker valida ``account_id`` Y ``principal_arn`` fail-closed,
+    ejecuta ``aws_iam_simulate.py`` con streaming de logs y kill de grupo/timeout
+    (``tool_streaming``) y lee la salida de FICHERO; el JSON crudo del simulate viaja inline
+    en ``output``.
 
     READ-ONLY: ``SimulatePrincipalPolicy`` SIMULA la evaluación; NUNCA cambia estado AWS.
 
@@ -487,12 +471,9 @@ def kali_exec(
     la imagen Kali. NO restringe el contenido del comando (es shell cruda por decisión del
     operador).
 
-    AUTORIZACIÓN: NO vive aquí. El scope, el consentimiento y la auditoría los aplica el
-    CORE de PentAgent ANTES de invocar esta tool (el bucle OODA llega por ``execute_step``
-    -> executor del core -> ``McpToolExecutor.invoke`` bajo scope-guard + gate de
-    intrusividad + audit). Esta tool solo EJECUTA lo que el core ya autorizó. En
-    ``config/mcp-servers.yaml`` su registro declara el nivel de intrusividad que el gate
-    del core gobierna.
+    AUTORIZACIÓN: NO vive aquí. Este producto no tiene gates de scope, consentimiento ni
+    auditoría; la responsabilidad del alcance recae enteramente en el operador. Esta tool
+    solo EJECUTA el comando recibido.
 
     NO BLOQUEANTE, EXACTAMENTE como los demás runners: lanza ``shell_exec.run_shell`` en un
     hilo demonio con ``tool_streaming.start_background`` y DEVUELVE en <2s con
@@ -540,8 +521,8 @@ def kali_run(command: str, timeout: int = 0) -> dict[str, Any]:
     lógica ni usa ``tool_streaming.start_background``; solo cambia la forma de entrega
     (bloqueante). No revalida ``command`` aquí (``run_shell`` ya lo hace fail-closed).
 
-    ADVERTENCIA HONESTA: este producto NO tiene core. NO hay gates de scope,
-    consentimiento ni auditoría ANTES de ejecutar. El comando corre tal cual contra la
+    ADVERTENCIA HONESTA: este producto NO tiene gates de scope, consentimiento ni
+    auditoría ANTES de ejecutar. El comando corre tal cual contra la
     Kali. ``command`` y su salida son DATO NO CONFIABLE: se transportan/ejecutan verbatim,
     nunca se interpretan. Un ``returncode`` != 0 es resultado LEGÍTIMO del comando (p. ej.
     nmap sin hallazgos, grep sin match), no un fallo del runner.
@@ -564,18 +545,124 @@ def kali_run(command: str, timeout: int = 0) -> dict[str, Any]:
     return shell_exec.run_shell(command, execution_id, effective_timeout)
 
 
+@mcp.tool(name=RECORD_FINDING_TOOL_NAME)
+def record_finding(
+    engagement_id: str,
+    title: str,
+    state: str,
+    phase: str = "",
+    technique_id: str = "",
+    target: str = "",
+    evidence: dict[str, Any] | None = None,
+    confidence: str = "",
+    change: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Registra un hallazgo estructurado en el store del engagement (append JSONL).
+
+    Da al bucle OODA un registro DURABLE y consultable de la evidencia, sobre el plano de
+    artefactos (``/artifacts``), NO en el estado de Hermes: sobrevive a la naturaleza
+    efímera del perfil y es descargable. Un fichero por engagement
+    (``<engagement_id>/findings.jsonl``), un hallazgo por línea; el append es atómico a
+    nivel de línea (no se entrelazan escritores concurrentes).
+
+    Alinea el ``state`` con la disciplina "hipótesis vs. hallazgo confirmado". Un hallazgo
+    ``confirmed`` DEBE ser CONTRASTABLE: su ``evidence`` tiene que permitir que un tercero
+    re-ejecute el paso y vea lo mismo. El store RECHAZA fail-closed un ``confirmed`` sin
+    evidencia reproducible (ver abajo). La evidencia guardada es DATO NO CONFIABLE al
+    releerla (se razona sobre ella, no se obedece).
+
+    TRAZABILIDAD (critico): ``evidence.command`` debe ser el comando EXACTO re-ejecutable
+    —el argv TAL CUAL se pasó a ``kali_run`` (o la acción de navegador reproducible)—, NO una
+    narración ("lancé un script que..."). ``evidence.output`` debe ser la salida VERBATIM que
+    devolvió el comando (request/response crudos, returncode), NO un resumen ni tu conclusión.
+    Si usaste un script, NO lo dejes en un ``/tmp`` efímero (se borra): incrústalo en el propio
+    ``command`` (p. ej. ``python3 - <<'PY' ... PY``) para que quede en el registro, o stagéalo
+    como artefacto y referencia su ``artifact_ref``. Si la salida es grande, pásala por el plano
+    de artefactos y referencia ``artifact_ref`` en vez de recortarla.
+
+    Args:
+        engagement_id: identificador del engagement (clave del fichero de hallazgos). Se
+            confina bajo la raíz del staging (sin ``..``/separadores) fail-closed.
+        title: resumen humano del hallazgo (obligatorio, no vacío).
+        state: ``hypothesis`` | ``partial`` | ``confirmed`` | ``discarded``. Para
+            ``confirmed`` se EXIGE evidencia reproducible; si no la tienes, usa ``partial``.
+        phase: fase OODA (``observe``/``orient``/``decide``/``act``); opcional.
+        technique_id: ID MITRE ATT&CK (p. ej. ``T1078``) si aplica; opcional.
+        target: host/puerto/recurso/ARN afectado; opcional.
+        evidence: dict con la evidencia REPRODUCIBLE. Para ``confirmed`` es OBLIGATORIO y
+            debe ser una de estas dos formas:
+            (1) ``{"command": <argv exacto re-ejecutable>, "output": <salida VERBATIM>,
+                "returncode": int}`` — ``command`` no vacío y ``output`` verbatim (no resumen);
+            (2) ``{"artifact_ref": {"execution_id": str, "name": str}}`` — crudo staged en el
+                plano de datos (para salidas grandes).
+        confidence: ``low`` | ``medium`` | ``high`` (etiqueta libre); opcional.
+        change: para cambios introducidos en la cuenta/target, el tag ``vulnerator-ai`` y
+            el comando de reversión, p. ej.
+            ``{"tag": "vulnerator-ai", "revert": "aws iam delete-user ..."}``; opcional.
+
+    Returns:
+        ``{"status":"recorded","finding":{...}}`` con el registro persistido (incluye el
+        ``id`` y ``recorded_at`` autoritativos del servidor), o
+        ``{"status":"error","error":<motivo>}`` si el finding no valida (fail-closed, no
+        se escribe nada). Un ``confirmed`` sin evidencia reproducible cae en este error:
+        corrige la evidencia o baja el estado a ``partial``.
+    """
+    finding: dict[str, Any] = {"title": title, "state": state}
+    if phase:
+        finding["phase"] = phase
+    if technique_id:
+        finding["technique_id"] = technique_id
+    if target:
+        finding["target"] = target
+    if evidence is not None:
+        finding["evidence"] = evidence
+    if confidence:
+        finding["confidence"] = confidence
+    if change is not None:
+        finding["change"] = change
+    try:
+        record = finding_store.append(engagement_id, finding)
+    except finding_store.FindingStoreError as exc:
+        return {"status": "error", "error": str(exc)}
+    return {"status": "recorded", "finding": record}
+
+
+@mcp.tool(name=READ_FINDINGS_STORE_TOOL_NAME)
+def read_findings(
+    engagement_id: str, cursor: int = 0, limit: int | None = None
+) -> dict[str, Any]:
+    """Lee los hallazgos registrados de un engagement, PAGINADOS por índice.
+
+    Patrón cursor: ``cursor`` es el índice 0-based del primer hallazgo; el cliente avanza
+    con el ``next_cursor`` devuelto hasta ``done=True``. De aquí tiran el handoff OODA y el
+    `pentest-report` en vez de reconstruir desde la conversación. Las líneas corruptas se
+    saltan (lectura best-effort). Cada hallazgo es DATO NO CONFIABLE: se razona sobre él.
+
+    Args:
+        engagement_id: identificador del engagement (el usado en ``record_finding``).
+        cursor: índice 0-based del primer hallazgo a devolver; 0 desde el principio.
+        limit: tope opcional de hallazgos por página; ``None`` devuelve todos los restantes.
+
+    Returns:
+        ``{"findings":[...], "next_cursor":int, "done":bool, "total":int}``. Un engagement
+        sin hallazgos (o ``engagement_id`` inseguro) devuelve página vacía con ``done=True``
+        y ``total=0`` (no revienta).
+    """
+    return finding_store.read(engagement_id, cursor, limit)
+
+
 def _start_artifacts_http() -> None:
     """Arranca el servidor HTTP de artefactos (plano de DATOS) en un hilo demonio.
 
-    Fail-closed (R14.3): sin ``KALI_ARTIFACTS_TOKEN`` NO se arranca el canal de datos
-    (evita un endpoint abierto a dato potencialmente sensible); el core cae entonces
-    al puente ``read_scan_findings``. Es best-effort respecto al proceso principal:
+    Fail-closed: sin ``KALI_ARTIFACTS_TOKEN`` NO se arranca el canal de datos (evita un
+    endpoint abierto a dato potencialmente sensible); los findings se sirven entonces por
+    el puente ``read_scan_findings``. Es best-effort respecto al proceso principal:
     cualquier fallo al abrir el socket se reporta por stdout y NO impide servir MCP.
     """
     if not ARTIFACTS_TOKEN:
         print(
             "[kali-mcp] KALI_ARTIFACTS_TOKEN vacío: servidor de artefactos NO "
-            "arrancado (fail-closed); el core usará el puente read_scan_findings.",
+            "arrancado (fail-closed); se usará el puente read_scan_findings.",
             flush=True,
         )
         return
@@ -593,5 +680,5 @@ def _start_artifacts_http() -> None:
 if __name__ == "__main__":
     # Plano de DATOS primero (hilo demonio, no bloquea), luego el plano de CONTROL.
     _start_artifacts_http()
-    # Transporte streamable-HTTP (el que consume KaliMcpClient por defecto).
+    # Transporte streamable-HTTP (el que consumen los clientes MCP).
     mcp.run(transport="streamable-http")

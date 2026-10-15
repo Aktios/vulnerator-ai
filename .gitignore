@@ -1,10 +1,40 @@
-# Secretos reales y entorno local (nunca versionar).
+# =============================================================================
+# .gitignore — mantener FUERA del repo público todo secreto, credencial o dato
+# de un engagement. Los ficheros *.example SÍ se versionan (son plantillas).
+# =============================================================================
+
+# --- Secretos y entorno local (NUNCA versionar) ---
 .env
+.env.*
+!.env.example
 *.local
 
-# Artefactos de Python / pytest (ruido de build, no fuente).
+# --- Credenciales AWS que pudieran caer en el árbol de trabajo ---
+.aws/
+credentials
+*.pem
+*.key
+!**/profile/env.example
+
+# --- Datos de un engagement: artefactos, hallazgos, informes, capturas ---
+# Evidencia y salida de pentest no deben acabar en el repo.
+artifacts/
+/artifacts/
+*.jsonl
+findings-*.json
+report-*.md
+*.pcap
+
+# --- Estado de perfil de Hermes generado en pruebas ---
+profiles/
+state.db
+state.db-*
+
+# --- Artefactos de Python / pytest (ruido de build, no fuente) ---
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.venv/
+venv/

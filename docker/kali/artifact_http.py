@@ -1,12 +1,12 @@
-"""Servidor HTTP de artefactos de `kali-mcp` — el canal del plano de DATOS (N23).
+"""Servidor HTTP de artefactos de `kali-mcp` — el canal del plano de DATOS.
 
 STDLIB PURA (``http.server``), independiente de ``mcp``/``anyio`` (vive en su propio
 módulo, testeable sin el SDK). Sirve el resultado CRUDO staged por ``artifact_store``
-al core, que lo baja por STREAM a su almacén persistente. Es el transporte que
-sustituye al evento SSE de 1 MiB: el blob grande viaja por AQUÍ (HTTP chunked por
-referencia), NUNCA por el canal de control (MCP).
+al cliente, que lo baja por STREAM. Es el transporte que sustituye al evento SSE de
+1 MiB: el blob grande viaja por AQUÍ (HTTP chunked por referencia), NUNCA por el canal
+de control (MCP).
 
-Frontera de seguridad (plan, architecture §4):
+Frontera de seguridad:
   - Exige la cabecera ``X-Artifact-Token`` == ``KALI_ARTIFACTS_TOKEN`` (403 sin ella o
     si no coincide; comparación en tiempo constante). Fail-closed: ``make_server`` NO
     arranca sin token.
@@ -25,13 +25,13 @@ from urllib.parse import unquote, urlsplit
 
 import artifact_store
 
-# Prefijo de ruta del endpoint de datos. Espejo del que el core compone al bajar.
+# Prefijo de ruta del endpoint de datos. Espejo del que el cliente compone al bajar.
 _PREFIX = "/artifacts/"
 
-# Tamaño de chunk al servir (64 KiB): stream, no "todo de golpe" (N23).
+# Tamaño de chunk al servir (64 KiB): stream, no "todo de golpe".
 _CHUNK_SIZE = 65536
 
-# Cabecera del token compartido kali<->core.
+# Cabecera del token compartido entre servidor y cliente.
 _TOKEN_HEADER = "X-Artifact-Token"
 
 
@@ -41,7 +41,7 @@ class _ArtifactHandler(BaseHTTPRequestHandler):
     server_version = "kali-artifacts/1.0"
 
     # Silencia el log por defecto: la ruta puede contener dato no confiable y no se
-    # loguea verbatim (F0.8). Si hiciera falta trazar, se haría por un canal propio.
+    # loguea verbatim. Si hiciera falta trazar, se haría por un canal propio.
     def log_message(self, *args, **kwargs) -> None:  # noqa: D401, ANN002, ANN003
         return
 
@@ -117,8 +117,8 @@ class _ArtifactHandler(BaseHTTPRequestHandler):
 def make_server(host: str, port: int, token: str) -> ThreadingHTTPServer:
     """Crea (sin arrancar) el servidor HTTP de artefactos ligado a ``token``.
 
-    Fail-closed (R14.3): levanta ``ValueError`` si ``token`` es vacío — un endpoint de
-    datos sin token sería un canal abierto a dato potencialmente sensible. ``port=0``
+    Fail-closed: levanta ``ValueError`` si ``token`` es vacío — un endpoint de datos sin
+    token sería un canal abierto a dato potencialmente sensible. ``port=0``
     elige un puerto efímero (útil en tests; el real se lee de ``server.server_address``).
     """
     if not token:

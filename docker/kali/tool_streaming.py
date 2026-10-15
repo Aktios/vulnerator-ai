@@ -1,6 +1,6 @@
 """Primitivas de *streaming* de salida de tools para `kali-mcp` (STDLIB PURA).
 
-Por qué un módulo separado (N13 KISS + testeabilidad):
+Por qué un módulo separado (testeabilidad):
   `docker/kali/kali_mcp_server.py` importa `mcp`/`anyio` en el top del módulo y
   esas dependencias NO están en el venv de desarrollo. Para poder cubrir la lógica
   de streaming con tests unitarios SIN el SDK, toda la mecánica vive aquí usando
@@ -11,11 +11,11 @@ Qué provee:
     con un `seq` creciente, para lectura incremental por cursor.
   - `run_tool_streaming(cmd, execution_id, timeout, ...)`: lanza un subproceso,
     vuelca su stdout/stderr línea a línea al ring en vivo, aplica un timeout y, al
-    expirar, mata el GRUPO de procesos completo (sin huérfanos, N18.3).
+    expirar, mata el GRUPO de procesos completo (sin huérfanos).
 
-Disciplina de seguridad (N-untrusted): la salida de la tool es DATO NO CONFIABLE.
-Aquí se TRANSPORTA verbatim (se trocea en líneas y se guarda tal cual); NUNCA se
-interpreta ni se ejecuta nada derivado de ella.
+Disciplina de seguridad: la salida de la tool es DATO NO CONFIABLE. Aquí se TRANSPORTA
+verbatim (se trocea en líneas y se guarda tal cual); NUNCA se interpreta ni se ejecuta
+nada derivado de ella.
 """
 
 from __future__ import annotations
@@ -88,12 +88,12 @@ class _Execution:
 _executions: dict[str, _Execution] = {}
 _registry_lock = threading.Lock()
 
-# --- Registro de cancelación por execution_id (N22.2) ------------------------
-# Para cancelar un escaneo EN CURSO desde fuera (tool `cancel_scan` -> core ->
-# endpoint REST/MCP), hace falta (a) una señal cooperativa y (b) una referencia al
-# proceso vivo para matar su grupo. Separado del ring (salida) y del estado: aquí sólo
-# viven el Popen vivo y un Event de cancelación por ejecución. Reutiliza el kill de
-# grupo que ya existe (`_kill_process_group`), NO duplica el mecanismo (N13).
+# --- Registro de cancelación por execution_id -------------------------------
+# Para cancelar un escaneo EN CURSO desde fuera (tool `cancel_scan`), hace falta (a) una
+# señal cooperativa y (b) una referencia al proceso vivo para matar su grupo. Separado del
+# ring (salida) y del estado: aquí sólo viven el Popen vivo y un Event de cancelación por
+# ejecución. Reutiliza el kill de grupo que ya existe (`_kill_process_group`), NO duplica
+# el mecanismo.
 _procs: dict[str, "subprocess.Popen"] = {}
 _cancels: dict[str, threading.Event] = {}
 _procs_lock = threading.Lock()
@@ -115,7 +115,7 @@ def request_cancel(execution_id: str) -> bool:
     Idempotente y None-safe: si la ejecución no existe o ya terminó, marca el Event
     igualmente (por si el proceso aún no se registró) y devuelve ``False`` (no había
     proceso vivo que matar). Reutiliza :func:`_kill_process_group` (SIGTERM->SIGKILL
-    sobre el grupo, sin huérfanos — N18.3). Devuelve ``True`` si mató un proceso vivo.
+    sobre el grupo, sin huérfanos). Devuelve ``True`` si mató un proceso vivo.
     """
     with _procs_lock:
         event = _cancels.get(execution_id)
@@ -316,8 +316,7 @@ def _kill_process_group(proc: subprocess.Popen) -> None:
     """Mata el GRUPO de procesos del subproceso (SIGTERM, luego SIGKILL).
 
     El subproceso se lanza con `start_new_session=True`, así que es líder de su
-    propio grupo; matar el grupo entero evita huérfanos (N18.3) aunque Prowler
-    lance hijos.
+    propio grupo; matar el grupo entero evita huérfanos aunque Prowler lance hijos.
     """
     try:
         pgid = os.getpgid(proc.pid)

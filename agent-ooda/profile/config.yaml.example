@@ -8,16 +8,22 @@ model:
 
 mcp_servers:
   kali:
-    url: "http://kali:8900"                # el UNICO MCP: la Kali (contenedor `kali`). SIN headers/token.
+    url: "http://kali:8900"                # MCP de la Kali (contenedor `kali`). SIN headers/token.
     tools:
       # Whitelist de las tools reales del servidor kali-mcp (nombre tal como lo expone el servidor).
-      include: [kali_run, kali_exec, iam_enum, iam_simulate, get_scan_status, read_tool_logs, prowler_scan, server_info]
+      include: [kali_run, kali_exec, iam_enum, iam_simulate, get_scan_status, read_tool_logs, prowler_scan, record_finding, read_findings, server_info]
       prompts: false
       resources: false
+  playwright:
+    url: "http://playwright-mcp:8931/mcp"  # MCP del navegador (Chromium headless) para la parte web.
+    tools:
+      prompts: false                       # SIN include: se exponen las tools del navegador de la imagen.
+      resources: false
 
-# Unico toolset: el MCP de la Kali (dinamico `mcp-kali`). CERO tools nativas.
+# Dos toolsets: ambos MCP (Kali + navegador). CERO tools nativas (browser/web nativos desactivados).
 toolsets:
   - kali
+  - playwright
 
 terminal:
   backend: "local"            # Hermes no usa terminal nativa; ejecuta en la Kali via kali_run.

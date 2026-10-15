@@ -60,13 +60,13 @@ def test_finalize_scan_stages_artifact_and_done_has_ref_not_inline(staging):
     assert artifact["size"] == len(raw)
     assert artifact["sha256"] == hashlib.sha256(raw).hexdigest()
 
-    # El artefacto crudo quedó staged idéntico (lo servirá el HTTP al core).
+    # El artefacto crudo quedó staged idéntico (lo servirá el HTTP al cliente).
     staged = artifact_store.resolve("exec-1", prowler_artifact.PROWLER_ARTIFACT_NAME)
     assert staged.read_bytes() == raw
 
 
 def test_finalize_scan_keeps_read_scan_findings_bridge(staging):
-    """Puente intacto (N21): los findings quedan paginables por tool_streaming."""
+    """Puente intacto: los findings quedan paginables por tool_streaming."""
     outdir = staging / "scan-out"
     _write_ocsf(outdir, _ocsf(3))
 
@@ -107,7 +107,7 @@ def test_read_prowler_output_wraps_dict_payload(staging):
 def test_finalize_scan_bridge_survives_staging_failure(staging, monkeypatch):
     """Si el staging falla, se publica done SIN artifact ref pero el puente sigue.
 
-    Es la red de seguridad: el plano de datos nunca tumba el escaneo; el core cae al
+    Es la red de seguridad: el plano de datos nunca tumba el escaneo; se cae al
     puente read_scan_findings.
     """
     outdir = staging / "out"

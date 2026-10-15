@@ -1,12 +1,12 @@
-# config.yaml — perfil Hermes del ejecutor OODA de hermes-pentest (OODA DIRECTO a Kali).
+# config.yaml — perfil Hermes del ejecutor OODA de vulnerator-ai (OODA DIRECTO a Kali).
 # Vive en el home del perfil default de Hermes (/opt/data/config.yaml dentro del contenedor
 # ooda-agent; ver docker-compose.yml).
 #
-# DISENO: Hermes es CLIENTE del servidor MCP del contenedor `kali` (kali-mcp) y ejecuta las tools
-# de pentest DIRECTAMENTE sobre esa Kali. NO hay core/API/UI de PentAgent de por medio: no hay
-# gates (scope/consentimiento/intrusividad/audit/E4) ni contrato de 5 tools pentagent_*. La unica
-# via de Hermes al target es el MCP de `kali`, y la responsabilidad del alcance recae en el operador
-# (ver ADVERTENCIA del docker-compose.yml).
+# DISENO: Hermes es CLIENTE de dos servidores MCP y ejecuta las tools DIRECTAMENTE: el de la Kali
+# (`kali`, tools de pentest CLI) y el del navegador (`playwright`, Chromium headless para la parte
+# web). No hay core, API ni UI de por medio: no hay gates (scope/consentimiento/intrusividad/audit).
+# Toda la superficie de Hermes son esos dos MCP (cero toolsets nativos), y la responsabilidad del
+# alcance recae en el operador (ver ADVERTENCIA del docker-compose.yml).
 #
 # VERIFICADO contra la doc oficial de Hermes:
 #   - mcp_servers (HTTP + tools.include/exclude + prompts/resources):
@@ -25,9 +25,10 @@ model:
   # autorizado, por eso es el modelo del conductor OODA.
   default: "mistralai/mistral-large-4-0"
 
-# --- El UNICO servidor MCP: la Kali (contenedor `kali`) ---------------------
-# Hermes es CLIENTE de este MCP. Es su UNICA via al target: ejecuta las tools de pentest DIRECTO
-# sobre la Kali. Sintaxis verificada en mcp.md (HTTP servers + Per-server filtering).
+# --- Primer servidor MCP: la Kali (contenedor `kali`) -----------------------
+# Hermes es CLIENTE de este MCP: ejecuta las tools de pentest CLI DIRECTO sobre la Kali. Es la via
+# principal al target (el navegador va por el segundo MCP, `playwright`, mas abajo). Sintaxis
+# verificada en mcp.md (HTTP servers + Per-server filtering).
 #
 # NOMBRE DEL SERVER = `kali`. Hermes registra las tools MCP como `mcp_<server>_<tool>`, asi que las
 # tools efectivas son `mcp_kali_<tool>` (p. ej. `mcp_kali_kali_run`). El filtro `tools.include` se
@@ -45,6 +46,7 @@ mcp_servers:
       #   OBSERVE : server_info, prowler_scan, iam_enum
       #   ORIENT  : iam_simulate (AWS read-only), get_scan_status, read_tool_logs
       #   ACT     : kali_run (bloqueante, una llamada) / kali_exec (async + poll)
+      #   REGISTRO: record_finding / read_findings (store de hallazgos por engagement)
       include:
         - kali_run
         - kali_exec
@@ -53,27 +55,56 @@ mcp_servers:
         - get_scan_status
         - read_tool_logs
         - prowler_scan
+        - record_finding
+        - read_findings
         - server_info
       # Desactiva los wrappers de utilidad que Hermes anadiria (list_prompts/get_prompt,
       # list_resources/read_resource). Verificado en mcp.md ("Filter utility tools too").
       prompts: false
       resources: false
 
-# --- Toolsets: SOLO el MCP de la Kali ---------------------------------------
-# OBJETIVO: que Hermes NO tenga mas herramientas que las del MCP de `kali` — nada de terminal/
-# code_execution/file/browser/web nativos (ensucian el razonamiento del bucle OODA).
+  # --- Segundo MCP: el navegador (contenedor `playwright-mcp`) ----------------
+  # Da a Hermes un navegador REAL (Chromium headless) para la parte WEB del pentest, por
+  # MCP. NO reactiva ningun toolset nativo (browser/web siguen desactivados abajo): la
+  # superficie web es `mcp_playwright_*`, no el toolset `browser` de Hermes. Asi la parte
+  # web NO queda limitada a `kali_run`: las tools CLI (nmap/whatweb/nuclei/ffuf/sqlmap) van
+  # por la Kali y la navegacion/DOM/interaccion van por este MCP. Lo usa la skill
+  # `web-pentest`. Endpoint streamable-HTTP en `/mcp` (imagen oficial microsoft/playwright).
+  playwright:
+    url: "http://playwright-mcp:8931/mcp"
+    # SIN tools.include: se exponen las tools del navegador que trae la imagen (navigate,
+    # click, type, snapshot, evaluate, ...). El nombre efectivo que vera el modelo es
+    # `mcp_playwright_<tool>`. Se filtran los wrappers de utilidad igual que en kali.
+    tools:
+      prompts: false
+      resources: false
+
+# --- Toolsets: SOLO los dos MCP (Kali + navegador) --------------------------
+# OBJETIVO: que la superficie de Hermes sean EXCLUSIVAMENTE los dos MCP (`kali` + `playwright`) —
+# nada de terminal/code_execution/file/browser/web nativos (ensucian el razonamiento del bucle y
+# reintroducen superficie que no queremos). El navegador llega por MCP, NO por el toolset `browser`.
 #
 # `toolsets:` es una LISTA de bundles (toolsets-reference.md), NO `toolsets.enabled` (esa llave no
 # existe y Hermes la ignora -> caeria al platform toolset por defecto `hermes-api-server`, que trae
 # file/terminal/web/browser/code_execution...). Cada servidor MCP genera un toolset dinamico
-# `mcp-<server>` (aqui `mcp-kali`), referenciable por el nombre del server (`kali`). Al listar SOLO
-# `kali`, la unica superficie son las tools del MCP de la Kali (ya filtradas por tools.include).
+# `mcp-<server>` (aqui `mcp-kali` y `mcp-playwright`), referenciable por el nombre del server. Al
+# listar SOLO estos dos, la unica superficie son las tools de ambos MCP (ya filtradas por tools).
 toolsets:
-  - kali                 # unico toolset: el MCP de la Kali (dinamico `mcp-kali`). CERO tools nativas.
+  - kali                 # MCP de la Kali (dinamico `mcp-kali`): tools de pentest CLI.
+  - playwright           # MCP del navegador (dinamico `mcp-playwright`): web real. CERO tools nativas.
 
 # Defensa en profundidad (agent.disabled_toolsets, toolsets-reference.md): aunque `toolsets: [kali]`
 # ya excluye lo demas, se desactivan EXPLICITAMENTE los bundles nativos, por si un default de
 # plataforma los reintrodujera. Deben desaparecer del razonamiento del conductor OODA.
+#
+# EXCEPCION: `delegation` SI esta habilitado (NO esta en esta lista). El conductor OODA necesita
+# `delegate_task` para la HIGIENE DE CONTEXTO: puede delegar una rama de exploracion larga y acotada
+# (p. ej. "enumera todo este /24 y resume") a un SUBAGENTE con contexto FRESCO, que hereda los
+# toolsets del padre (`kali`+`playwright` -> `mcp_kali_*`/`mcp_playwright_*`) y SOLO devuelve su
+# resumen final al conductor. Asi el
+# contexto del bucle OODA no se infla con la salida cruda de ramas largas. Ver skill `pentest-ooda`
+# (seccion de delegacion). Verificado: delegation.md (delegate_task = contexto aislado + toolset
+# heredado + solo el resumen vuelve al padre).
 agent:
   disabled_toolsets:
     - code_execution
@@ -82,7 +113,6 @@ agent:
     - browser
     - web
     - search
-    - delegation
     - computer_use
     - memory
     - skills

@@ -1,4 +1,4 @@
-"""Runner multi-herramienta genérico de `kali-mcp` (STDLIB PURA) — N33.
+"""Runner multi-herramienta genérico de `kali-mcp` (STDLIB PURA).
 
 Generaliza el patrón de collection EN VIVO (hasta ahora específico de Prowler) a varias
 tools (Prowler/ScoutSuite/Cloudsplaining) bajo UN contrato único: un **registro** por
@@ -13,13 +13,12 @@ Por qué un módulo aparte (igual que ``tool_streaming``/``artifact_store``/``pr
 mecánica del runner vive aquí con SOLO la librería estándar, así se cubre con tests sin el
 SDK. Reutiliza ``tool_streaming`` (streaming + kill de grupo + cancelación) y
 ``artifact_store`` (staging del crudo) ya existentes; Prowler delega en ``prowler_artifact``
-(mismo finalize + puente SSE de compat) — cero duplicación (N13).
+(mismo finalize + puente SSE de compat) — cero duplicación.
 
-Separación de planos (architecture §1/§5): el crudo de CUALQUIER tool viaja por el plano de
-DATOS (artefactos); el ``done`` del CONTROL sólo lleva la referencia. Para fuentes no-Prowler
-NO se popula el puente SSE ``set_findings`` (D6): su salida es un documento JSON único que
-el core baja por el plano de datos. Disciplina arm64 (R3.2/4.4): si el binario no está, se
-reporta (no se finge).
+Separación de planos: el crudo de CUALQUIER tool viaja por el plano de DATOS (artefactos);
+el ``done`` del CONTROL sólo lleva la referencia. Para fuentes no-Prowler NO se popula el
+puente SSE ``set_findings``: su salida es un documento JSON único que se baja por el plano
+de datos. Disciplina arm64: si el binario no está, se reporta (no se finge).
 """
 
 from __future__ import annotations
@@ -39,7 +38,7 @@ import tool_streaming
 # Timeout por defecto de una collection (segundos); el server puede pasar el suyo.
 DEFAULT_TIMEOUT = int(os.environ.get("COLLECTION_TIMEOUT", os.environ.get("PROWLER_TIMEOUT", "900")))
 
-# Nombres canónicos del artefacto crudo por fuente (deben casar con el fallback del core).
+# Nombres canónicos del artefacto crudo por fuente.
 PROWLER_ARTIFACT_NAME = prowler_artifact.PROWLER_ARTIFACT_NAME  # "prowler.ocsf.json"
 SCOUTSUITE_ARTIFACT_NAME = "scoutsuite.results.json"
 CLOUDSPLAINING_ARTIFACT_NAME = "cloudsplaining.results.json"
@@ -110,7 +109,7 @@ def _scoutsuite_commands(account_id: str, workdir: str, outdir: str, params: dic
             "--report-dir",
             outdir,
             "--report-name",
-            "pentagent",
+            "hermes",
         ]
     ]
 
@@ -160,7 +159,7 @@ def _locate_newest(outdir: Path, patterns: tuple[str, ...]) -> Path | None:
 
 def _scoutsuite_locate(outdir: Path) -> Path | None:
     # ScoutSuite escribe el crudo en ``scoutsuite-results/scoutsuite_results_*.js`` (o .json
-    # con --result-format json). El envoltorio ``.js`` lo tolera el normalizador del core.
+    # con --result-format json). El envoltorio ``.js`` lo tolera el normalizador del consumidor.
     return _locate_newest(
         outdir, ("scoutsuite_results_*.js", "scoutsuite_results_*.json")
     )
@@ -194,10 +193,10 @@ def _finalize_artifact(
     artifact_name: str,
     locate: Callable[[Path], Path | None],
 ) -> dict[str, Any] | None:
-    """Finaliza una collection NO-Prowler: stagea el crudo y construye el ``done`` (D6).
+    """Finaliza una collection NO-Prowler: stagea el crudo y construye el ``done``.
 
-    NO popula el puente SSE ``set_findings`` (la salida es un documento JSON único que el
-    core baja por el plano de datos). Si no hay salida legible, devuelve ``None`` (el caller
+    NO popula el puente SSE ``set_findings`` (la salida es un documento JSON único que se
+    baja por el plano de datos). Si no hay salida legible, devuelve ``None`` (el caller
     publica ``failed`` con diagnóstico).
     """
     path = locate(outdir)
@@ -237,7 +236,7 @@ def _prowler_finalize(
 
 @dataclass(frozen=True)
 class CollectorSpec:
-    """Contrato de un collector EN VIVO (una entrada del registro, N33)."""
+    """Contrato de un collector EN VIVO (una entrada del registro)."""
 
     source: str
     binary: str
@@ -302,8 +301,8 @@ def finalize(
 ) -> dict[str, Any] | None:
     """Finaliza una collection ya ejecutada: stagea el crudo y construye el ``done``.
 
-    Punto único reutilizable (lo usa ``run_collection`` y el gate funcional del core, que
-    stagea un crudo de fixture por fuente). Despacha al ``finalize`` de la fuente.
+    Punto único reutilizable (lo usan ``run_collection`` y los tests, que stagean un crudo
+    de fixture por fuente). Despacha al ``finalize`` de la fuente.
     """
     spec = REGISTRY.get(source)
     if spec is None:
@@ -321,8 +320,8 @@ def run_collection(
     """Worker genérico: lanza la tool de ``source`` y devuelve el ``done``/``failed``.
 
     Corre en el hilo de ``tool_streaming.start_background`` (indexado por ``execution_id``).
-    Flujo (architecture §5): valida binario -> ejecuta el/los comando(s) con streaming de
-    logs en vivo y kill de grupo al timeout/cancelación -> localiza el crudo -> stagea como
+    Flujo: valida binario -> ejecuta el/los comando(s) con streaming de logs en vivo y kill
+    de grupo al timeout/cancelación -> localiza el crudo -> stagea como
     artefacto -> construye el ``done`` con la REFERENCIA (no la carga). Reporta ``failed`` con
     diagnóstico si no hay binario o salida legible; ``cancelled`` si el usuario cancela.
     """
@@ -330,7 +329,7 @@ def run_collection(
     if spec is None:
         raise RuntimeError(f"fuente de collection desconocida: {source!r}")
     if shutil.which(spec.binary) is None:
-        # arm64 u otra arquitectura sin la tool: se reporta, no se finge (R3.2/4.4).
+        # arm64 u otra arquitectura sin la tool: se reporta, no se finge.
         raise RuntimeError(
             f"La tool {spec.binary!r} (fuente {source!r}) no está disponible en este "
             f"runtime ({os.uname().machine}); no se finge la collection."

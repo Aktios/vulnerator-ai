@@ -1,0 +1,275 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="860" viewBox="0 0 1320 860" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b6fb5"/>
+    </marker>
+    <marker id="arrowG" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2a9e74"/>
+    </marker>
+    <marker id="arrowO" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d99036"/>
+    </marker>
+    <marker id="arrowLoop" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a6fc4"/>
+    </marker>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3.5" flood-color="#9aa7bd" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1320" height="860" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="46" fill="#1b2b45" font-size="26" font-weight="700">vulnerator-ai · arquitectura del montaje</text>
+  <text x="40" y="70" fill="#5f7characterData" font-size="14"></text>
+  <text x="40" y="70" fill="#60748f" font-size="14">OODA pentest conducido por Hermes — pilotado desde Claude Code por HTTP</text>
+
+  <!-- ===================== OPERATOR ===================== -->
+  <g filter="url(#soft)">
+    <rect x="36" y="104" width="236" height="286" rx="16" fill="#f7f9fc" stroke="#c3d0e2" stroke-width="1.5"/>
+  </g>
+  <text x="154" y="132" fill="#60748f" font-size="12" text-anchor="middle" letter-spacing="1.5">OPERADOR</text>
+
+  <!-- pentester icon -->
+  <g transform="translate(154,196)">
+    <circle cx="0" cy="-16" r="22" fill="#5b7fb0"/>
+    <path d="M-31,40 a31,31 0 0 1 62,0 z" fill="#5b7fb0"/>
+    <path d="M-24,-27 q24,-18 48,0 l-6,6 q-18,-12 -36,0 z" fill="#2f4straightforward" />
+    <path d="M-24,-27 q24,-18 48,0 l-6,6 q-18,-12 -36,0 z" fill="#334e74"/>
+  </g>
+  <text x="154" y="258" fill="#1b2b45" font-size="16" font-weight="600" text-anchor="middle">Pentester</text>
+
+  <!-- Claude Code box -->
+  <g filter="url(#soft)">
+    <rect x="62" y="282" width="184" height="92" rx="12" fill="#fdf4ec" stroke="#d99036" stroke-width="1.5"/>
+  </g>
+  <g transform="translate(88,312)">
+    <rect x="-6" y="-6" width="36" height="36" rx="9" fill="#d97a44"/>
+    <text x="12" y="19" font-size="21" text-anchor="middle" fill="#fff">✳</text>
+  </g>
+  <text x="162" y="312" fill="#8a5a28" font-size="15" font-weight="600" text-anchor="middle">Claude Code</text>
+  <text x="162" y="331" fill="#a06f3a" font-size="11" text-anchor="middle">asistente externo</text>
+  <text x="162" y="349" fill="#60748f" font-size="10.5" text-anchor="middle">dispara · observa · resume</text>
+  <text x="162" y="365" fill="#8495ab" font-size="10" text-anchor="middle">(no razona el pentest)</text>
+
+  <!-- ===================== DOCKER HOST ===================== -->
+  <g filter="url(#soft)">
+    <rect x="312" y="96" width="972" height="520" rx="18" fill="#f4f9fe" stroke="#2a85d0" stroke-width="2"/>
+  </g>
+  <!-- docker whale icon -->
+  <g transform="translate(338,120)">
+    <rect x="0" y="6" width="11" height="9" fill="#2a9fe0"/>
+    <rect x="13" y="6" width="11" height="9" fill="#2a9fe0"/>
+    <rect x="26" y="6" width="11" height="9" fill="#2a9fe0"/>
+    <rect x="13" y="-4" width="11" height="9" fill="#2a9fe0"/>
+    <path d="M-6,17 q24,18 50,0 q6,-12 -4,-9 q-4,-9 -13,-3 q-12,-4 -12,7 q-14,-2 -17,5 z" fill="#1b7fc0"/>
+  </g>
+  <text x="388" y="130" fill="#1b5a92" font-size="14" font-weight="700">Docker host · docker-compose (red interna del proyecto)</text>
+  <text x="388" y="149" fill="#5f87ab" font-size="11">un stack completo por pentester · aislar con  docker compose -p pentest-&lt;nombre&gt;</text>
+
+  <!-- ===================== OODA-AGENT (Hermes) ===================== -->
+  <g filter="url(#soft)">
+    <rect x="336" y="178" width="412" height="406" rx="14" fill="#f6f3ff" stroke="#7a5cff" stroke-width="1.8"/>
+  </g>
+  <g transform="translate(366,210)">
+    <circle cx="0" cy="0" r="16" fill="#8a6cff"/>
+    <path d="M-24,-3 q9,-6 16,0 q-8,3 -16,0 z" fill="#c3b4ff"/>
+    <path d="M24,-3 q-9,-6 -16,0 q8,3 16,0 z" fill="#c3b4ff"/>
+    <text x="0" y="6" font-size="16" text-anchor="middle" fill="#fff" font-weight="700">H</text>
+  </g>
+  <text x="392" y="206" fill="#5a3fc0" font-size="16" font-weight="700">ooda-agent</text>
+  <text x="392" y="224" fill="#8a78c4" font-size="11.5">Hermes · conductor del bucle OODA (el cerebro)</text>
+
+  <!-- API server -->
+  <g filter="url(#soft)">
+    <rect x="358" y="246" width="368" height="60" rx="10" fill="#efeaff" stroke="#9a86e0" stroke-width="1.3"/>
+  </g>
+  <text x="374" y="272" font-size="18">🔌</text>
+  <text x="402" y="270" fill="#4a3a8c" font-size="13.5" font-weight="600">API server OpenAI-compatible · :8642</text>
+  <text x="402" y="290" fill="#7a6cb0" font-size="10.5">/v1/runs · /events (SSE) · /steer · /stop · /health — Bearer key</text>
+
+  <!-- Perfil declarativo: prompts + skills -->
+  <g filter="url(#soft)">
+    <rect x="358" y="316" width="368" height="118" rx="10" fill="#f1edfb" stroke="#9b8cd0" stroke-width="1.2"/>
+  </g>
+  <text x="374" y="338" fill="#5a4a9c" font-size="11.5" font-weight="600">perfil declarativo  (agent-ooda/ → /opt/data)</text>
+  <g transform="translate(374,350)">
+    <rect x="0" y="0" width="164" height="70" rx="8" fill="#fbfaff" stroke="#b3a6e0" stroke-width="1"/>
+    <text x="13" y="26" font-size="17">📜</text>
+    <text x="38" y="22" fill="#4a3a8c" font-size="12" font-weight="600">prompts</text>
+    <text x="38" y="39" fill="#7a6cb0" font-size="9.5">SOUL.md · ephemeral-system</text>
+    <text x="13" y="58" fill="#8a7cc0" font-size="9">identidad + system del OODA</text>
+  </g>
+  <g transform="translate(546,350)">
+    <rect x="0" y="0" width="164" height="70" rx="8" fill="#fbfaff" stroke="#b3a6e0" stroke-width="1"/>
+    <text x="13" y="26" font-size="17">🧩</text>
+    <text x="38" y="22" fill="#4a3a8c" font-size="12" font-weight="600">skills</text>
+    <text x="13" y="40" fill="#7a6cb0" font-size="9">pentest-ooda · attack-navigation</text>
+    <text x="13" y="54" fill="#7a6cb0" font-size="9">l3-recon · aws-pacu · web · report</text>
+  </g>
+
+  <!-- MCP client -->
+  <g filter="url(#soft)">
+    <rect x="358" y="444" width="368" height="52" rx="9" fill="#eaf2fc" stroke="#5fa0e0" stroke-width="1.2"/>
+  </g>
+  <text x="374" y="476" font-size="17">🔗</text>
+  <text x="402" y="468" fill="#2d5a92" font-size="12.5" font-weight="600">cliente MCP · cero toolsets nativos</text>
+  <text x="402" y="485" fill="#5f87ab" font-size="10">toda la superficie de Hermes = los 2 MCP de la derecha</text>
+
+  <text x="542" y="524" fill="#7a6cb0" font-size="10" text-anchor="middle">modelo conductor: mistralai/mistral-large-4-0</text>
+  <text x="542" y="539" fill="#9a8cc0" font-size="9" text-anchor="middle">(acepta el encuadre ofensivo autorizado)</text>
+
+  <!-- ===================== KALI MCP ===================== -->
+  <g filter="url(#soft)">
+    <rect x="770" y="178" width="490" height="236" rx="14" fill="#eefafc" stroke="#17a8ba" stroke-width="1.8"/>
+  </g>
+  <g transform="translate(800,212)">
+    <path d="M-15,13 L0,-16 L15,13 z" fill="#17c0d4"/>
+    <circle cx="0" cy="-1" r="4.5" fill="#0c2b31"/>
+  </g>
+  <text x="828" y="206" fill="#0f7a88" font-size="16" font-weight="700">kali</text>
+  <text x="828" y="224" fill="#3f99a6" font-size="11.5">runtime de tools de pentest · servidor kali-mcp</text>
+
+  <g filter="url(#soft)">
+    <rect x="794" y="246" width="442" height="56" rx="10" fill="#e2f6f9" stroke="#2bb6c9" stroke-width="1.2"/>
+  </g>
+  <text x="810" y="272" font-size="17">🔗</text>
+  <text x="838" y="270" fill="#0f6a78" font-size="13" font-weight="600">kali-mcp (streamable-HTTP) · :8900</text>
+  <text x="838" y="288" fill="#3f99a6" font-size="10">kali_run · iam_enum · prowler_scan · record_finding …</text>
+
+  <g filter="url(#soft)">
+    <rect x="794" y="312" width="214" height="50" rx="9" fill="#e8f8fa" stroke="#239aac" stroke-width="1"/>
+  </g>
+  <text x="810" y="334" font-size="14">🛠️</text>
+  <text x="834" y="333" fill="#0f6a78" font-size="11.5" font-weight="600">tools CLI</text>
+  <text x="810" y="351" fill="#3f99a6" font-size="9">nmap · nuclei · ffuf · sqlmap · Pacu</text>
+
+  <g filter="url(#soft)">
+    <rect x="1022" y="312" width="214" height="50" rx="9" fill="#e8f8fa" stroke="#239aac" stroke-width="1"/>
+  </g>
+  <text x="1038" y="334" font-size="14">📦</text>
+  <text x="1062" y="333" fill="#0f6a78" font-size="11.5" font-weight="600">artefactos + findings</text>
+  <text x="1038" y="351" fill="#3f99a6" font-size="9">/artifacts · findings.jsonl · :8901</text>
+
+  <text x="794" y="388" fill="#3f99a6" font-size="10">cloud read-only (opcional): Prowler · ScoutSuite · Cloudsplaining — credenciales AWS por stack</text>
+
+  <!-- ===================== PLAYWRIGHT MCP ===================== -->
+  <g filter="url(#soft)">
+    <rect x="770" y="430" width="490" height="130" rx="14" fill="#eefbf2" stroke="#36b06c" stroke-width="1.8"/>
+  </g>
+  <g transform="translate(800,464)">
+    <circle cx="0" cy="0" r="15" fill="#3fbf74"/>
+    <text x="0" y="6" font-size="16" text-anchor="middle">🎭</text>
+  </g>
+  <text x="828" y="458" fill="#1f8a4e" font-size="15" font-weight="700">playwright-mcp</text>
+  <text x="828" y="476" fill="#3f9e66" font-size="11">navegador real · Chromium headless</text>
+  <g filter="url(#soft)">
+    <rect x="794" y="492" width="442" height="52" rx="10" fill="#e4f7ea" stroke="#3fbf74" stroke-width="1.2"/>
+  </g>
+  <text x="810" y="520" font-size="17">🔗</text>
+  <text x="838" y="514" fill="#1f8a4e" font-size="12.5" font-weight="600">MCP del navegador · :8931/mcp</text>
+  <text x="838" y="532" fill="#3f9e66" font-size="10">navigate · click · type · snapshot · evaluate</text>
+
+  <!-- ===================== OPENROUTER (external) ===================== -->
+  <g filter="url(#soft)">
+    <rect x="336" y="636" width="300" height="84" rx="13" fill="#fdf6ea" stroke="#d99036" stroke-width="1.6"/>
+  </g>
+  <g transform="translate(368,678)">
+    <circle cx="0" cy="0" r="18" fill="#e0a44a"/>
+    <text x="0" y="7" font-size="18" text-anchor="middle">☁️</text>
+  </g>
+  <text x="412" y="670" fill="#8a5a28" font-size="14" font-weight="700">OpenRouter</text>
+  <text x="412" y="689" fill="#a06f3a" font-size="10.5">proveedor LLM (remoto)</text>
+  <text x="412" y="706" fill="#b08048" font-size="9.5">Mistral Large · stateless · N llamadas paralelas</text>
+
+  <!-- ============ OODA + ATT&CK PANEL ============ -->
+  <g filter="url(#soft)">
+    <rect x="662" y="636" width="622" height="192" rx="14" fill="#faf7ff" stroke="#8a6fc4" stroke-width="1.6"/>
+  </g>
+  <text x="682" y="662" fill="#5a3fc0" font-size="13.5" font-weight="700">El bucle OODA  ·  ATT&amp;CK como idioma del Orient</text>
+
+  <!-- OODA circular nodes -->
+  <!-- Observe -->
+  <g transform="translate(726,730)">
+    <circle r="30" fill="#eef4fc" stroke="#3b6fb5" stroke-width="1.6"/>
+    <text x="0" y="-3" font-size="12" font-weight="700" fill="#2d5a92" text-anchor="middle">Observe</text>
+    <text x="0" y="13" font-size="8.5" fill="#5f87ab" text-anchor="middle">server_info</text>
+  </g>
+  <!-- Orient -->
+  <g transform="translate(858,730)">
+    <circle r="30" fill="#f3eefc" stroke="#8a6fc4" stroke-width="1.6"/>
+    <text x="0" y="-3" font-size="12" font-weight="700" fill="#5a3fc0" text-anchor="middle">Orient</text>
+    <text x="0" y="13" font-size="8.5" fill="#8a78c4" text-anchor="middle">+ ATT&amp;CK</text>
+  </g>
+  <!-- Decide -->
+  <g transform="translate(990,730)">
+    <circle r="30" fill="#fdf4ec" stroke="#d99036" stroke-width="1.6"/>
+    <text x="0" y="-3" font-size="12" font-weight="700" fill="#8a5a28" text-anchor="middle">Decide</text>
+    <text x="0" y="13" font-size="8.5" fill="#a06f3a" text-anchor="middle">alternativas</text>
+  </g>
+  <!-- Act -->
+  <g transform="translate(1122,730)">
+    <circle r="30" fill="#eefaf2" stroke="#36b06c" stroke-width="1.6"/>
+    <text x="0" y="-3" font-size="12" font-weight="700" fill="#1f8a4e" text-anchor="middle">Act</text>
+    <text x="0" y="13" font-size="8.5" fill="#3f9e66" text-anchor="middle">kali_run</text>
+  </g>
+
+  <!-- arrows between OODA nodes -->
+  <path d="M757,730 L826,730" fill="none" stroke="#8a6fc4" stroke-width="2" marker-end="url(#arrowLoop)"/>
+  <path d="M889,730 L958,730" fill="none" stroke="#8a6fc4" stroke-width="2" marker-end="url(#arrowLoop)"/>
+  <path d="M1021,730 L1090,730" fill="none" stroke="#8a6fc4" stroke-width="2" marker-end="url(#arrowLoop)"/>
+  <!-- loop back Act -> Observe -->
+  <path d="M1122,761 C1122,800 726,800 726,761" fill="none" stroke="#8a6fc4" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrowLoop)"/>
+  <text x="924" y="796" fill="#8a6fc4" font-size="9.5" text-anchor="middle">registra evidencia (technique_id) · 3 sin progreso → handoff</text>
+
+  <!-- ATT&CK note under Orient -->
+  <text x="858" y="686" fill="#7a6cb0" font-size="9" text-anchor="middle">"¿qué táctica toca ahora?"</text>
+  <path d="M858,690 L858,699" fill="none" stroke="#8a6fc4" stroke-width="1.3" marker-end="url(#arrowLoop)"/>
+
+  <!-- ============ FLOWS ============ -->
+  <!-- Claude Code -> API server (HTTP) -->
+  <path d="M246,320 C290,320 300,276 358,276" fill="none" stroke="#3b6fb5" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <rect x="250" y="288" width="104" height="30" rx="7" fill="#eef4fc" stroke="#b3c6e0"/>
+  <text x="302" y="301" fill="#2d5a92" font-size="9.5" text-anchor="middle" font-weight="600">HTTP + Bearer</text>
+  <text x="302" y="313" fill="#5f87ab" font-size="8.5" text-anchor="middle">POST /v1/runs</text>
+
+  <!-- events back (SSE) -->
+  <path d="M358,294 C300,294 292,338 246,338" fill="none" stroke="#2a9e74" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowG)"/>
+  <text x="300" y="356" fill="#2a9e74" font-size="9" text-anchor="middle">eventos SSE / estado ↩</text>
+
+  <!-- Hermes MCP client -> kali -->
+  <path d="M726,462 C748,462 748,274 794,274" fill="none" stroke="#3b6fb5" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <text x="762" y="372" fill="#3b6fb5" font-size="9.5" text-anchor="middle" transform="rotate(-90 762 372)">MCP · kali:8900</text>
+
+  <!-- Hermes MCP client -> playwright -->
+  <path d="M726,476 C748,476 748,518 794,518" fill="none" stroke="#3b6fb5" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <text x="760" y="502" fill="#3b6fb5" font-size="9.5" text-anchor="middle">MCP · :8931</text>
+
+  <!-- Hermes -> OpenRouter -->
+  <path d="M470,496 C470,560 470,590 470,636" fill="none" stroke="#d99036" stroke-width="2.2" marker-end="url(#arrowO)"/>
+  <text x="486" y="580" fill="#b08048" font-size="9.5" text-anchor="start">razonamiento LLM</text>
+
+  <!-- kali -> target -->
+  <path d="M1236,274 C1270,274 1270,274 1296,274" fill="none" stroke="#17a8ba" stroke-width="2.2" marker-end="url(#arrow)"/>
+  <text x="1180" y="258" fill="#17a8ba" font-size="10" text-anchor="start">→ target autorizado</text>
+
+  <!-- ============ LEGEND ============ -->
+  <g transform="translate(36,408)">
+    <rect x="0" y="0" width="236" height="200" rx="13" fill="#f7f9fc" stroke="#c3d0e2" stroke-width="1.2"/>
+    <text x="16" y="28" fill="#1b2b45" font-size="12.5" font-weight="700">Flujos</text>
+
+    <line x1="16" y1="50" x2="48" y2="50" stroke="#3b6fb5" stroke-width="2.4" marker-end="url(#arrow)"/>
+    <text x="58" y="54" fill="#45586f" font-size="10.5">petición / llamada</text>
+
+    <line x1="16" y1="74" x2="48" y2="74" stroke="#2a9e74" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowG)"/>
+    <text x="58" y="78" fill="#45586f" font-size="10.5">eventos / respuesta</text>
+
+    <line x1="16" y1="98" x2="48" y2="98" stroke="#d99036" stroke-width="2.2" marker-end="url(#arrowO)"/>
+    <text x="58" y="102" fill="#45586f" font-size="10.5">LLM (OpenRouter)</text>
+
+    <text x="16" y="134" fill="#1b2b45" font-size="12.5" font-weight="700">Puertos (host)</text>
+    <text x="16" y="156" fill="#45586f" font-size="10">:8642 API Hermes · :8900 kali-mcp</text>
+    <text x="16" y="174" fill="#45586f" font-size="10">:8901 artefactos · :8931 playwright (int.)</text>
+    <text x="16" y="192" fill="#8495ab" font-size="9.5">Claude Code dispara; Hermes razona el OODA</text>
+  </g>
+</svg>

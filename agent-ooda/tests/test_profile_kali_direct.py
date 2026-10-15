@@ -1,8 +1,8 @@
 """Tests declarativos del perfil Hermes (OODA directo a Kali) y su cableado en el compose.
 
 El perfil es config declarativa (YAML/Markdown), no codigo ejecutable del repo. Estos tests
-afirman el CONTRATO declarativo: el config apunta SOLO al MCP de la Kali (sin core), con la
-whitelist de tools reales, y el servicio ooda-agent del compose arranca Hermes contra esa Kali.
+afirman el CONTRATO declarativo: el config apunta SOLO al MCP de la Kali, con la whitelist de
+tools reales, y el servicio ooda-agent del compose arranca Hermes contra esa Kali.
 """
 
 from __future__ import annotations
@@ -20,12 +20,17 @@ EXPECTED_TOOLS = [
     "get_scan_status",
     "read_tool_logs",
     "prowler_scan",
+    "record_finding",
+    "read_findings",
     "server_info",
 ]
 
-# Tools/contrato del nucleo retirado que NO deben reaparecer en el perfil (diseno sin core).
-# Los nombres se componen por partes para que las cadenas literales del contrato antiguo no queden
-# escritas en el fichero (el grep de desacople del core no debe encontrarlas aqui).
+# Servidores MCP que el perfil debe declarar (Kali + navegador por MCP).
+EXPECTED_MCP_SERVERS = ["kali", "playwright"]
+
+# Tools de un contrato de orquestador externo que NO deben reaparecer en el perfil: el agente
+# habla SOLO con el MCP de la Kali. Los nombres se componen por partes a propósito, para que las
+# cadenas literales no queden escritas en el fichero.
 _PREFIX = "penta" + "gent_"
 FORBIDDEN_TOOLS = [
     _PREFIX + "get_findings",
@@ -45,17 +50,23 @@ def _load_config(profile_config_path: Path) -> dict:
     return yaml.safe_load(profile_config_path.read_text(encoding="utf-8"))
 
 
-def test_mcp_server_is_only_kali(profile_config_path: Path) -> None:
+def test_mcp_servers_are_kali_and_playwright(profile_config_path: Path) -> None:
     cfg = _load_config(profile_config_path)
     servers = cfg["mcp_servers"]
-    assert list(servers) == ["kali"], "el UNICO servidor MCP debe ser 'kali'"
-    assert "pa" not in servers, "no debe quedar el server 'pa' del core"
-    assert "pentagent" not in servers, "no debe quedar el server 'pentagent' del core"
+    assert list(servers) == EXPECTED_MCP_SERVERS, "los MCP deben ser exactamente kali y playwright"
+    # No debe reaparecer el contrato de un orquestador externo retirado.
+    assert "pa" not in servers
+    assert "pentagent" not in servers
 
 
 def test_kali_url_points_to_kali_mcp(profile_config_path: Path) -> None:
     cfg = _load_config(profile_config_path)
     assert cfg["mcp_servers"]["kali"]["url"] == "http://kali:8900"
+
+
+def test_playwright_url_points_to_browser_mcp(profile_config_path: Path) -> None:
+    cfg = _load_config(profile_config_path)
+    assert cfg["mcp_servers"]["playwright"]["url"] == "http://playwright-mcp:8931/mcp"
 
 
 def test_kali_server_has_no_auth_headers(profile_config_path: Path) -> None:
@@ -73,11 +84,11 @@ def test_whitelist_is_exact_kali_tools(profile_config_path: Path) -> None:
     assert "kali_run" in include
 
 
-def test_forbidden_core_tools_absent(profile_config_path: Path) -> None:
+def test_forbidden_tools_absent(profile_config_path: Path) -> None:
     cfg = _load_config(profile_config_path)
     include = cfg["mcp_servers"]["kali"]["tools"]["include"]
     for tool in FORBIDDEN_TOOLS:
-        assert tool not in include, f"{tool} (contrato del core) no debe estar en la whitelist"
+        assert tool not in include, f"{tool} (contrato externo) no debe estar en la whitelist"
 
 
 def test_utility_wrappers_disabled(profile_config_path: Path) -> None:
@@ -91,8 +102,12 @@ def test_native_toolsets_trimmed(profile_config_path: Path) -> None:
     cfg = _load_config(profile_config_path)
     toolsets = cfg.get("toolsets")
     assert isinstance(toolsets, list), "toolsets debe ser una LISTA de bundles (no un dict)"
-    assert toolsets == ["kali"], "la unica superficie debe ser el MCP `kali` (sin toolsets nativos)"
+    assert toolsets == ["kali", "playwright"], (
+        "la superficie deben ser los dos MCP (kali + playwright), sin toolsets nativos"
+    )
     disabled = cfg.get("agent", {}).get("disabled_toolsets", [])
+    # El navegador llega por MCP (`playwright`), NO por el toolset `browser` nativo: este sigue
+    # desactivado, igual que el resto de bundles nativos.
     for bundle in ("code_execution", "terminal", "file", "browser", "web"):
         assert bundle in disabled, f"{bundle} debe estar en agent.disabled_toolsets"
 
@@ -131,22 +146,35 @@ def _load_ooda_agent(compose_path: Path) -> dict:
     return _load_services(compose_path)["ooda-agent"]
 
 
-def test_compose_services_are_kali_and_ooda_agent(compose_path: Path) -> None:
+def test_compose_services_are_kali_playwright_and_ooda_agent(compose_path: Path) -> None:
     services = _load_services(compose_path)
-    assert set(services) == {"kali", "ooda-agent"}, "solo kali y ooda-agent (sin api/ui)"
+    assert set(services) == {"kali", "playwright-mcp", "ooda-agent"}, (
+        "los servicios deben ser kali, playwright-mcp y ooda-agent (sin api/ui)"
+    )
 
 
-def test_ooda_agent_depends_on_kali_healthy(compose_path: Path) -> None:
+def test_ooda_agent_depends_on_both_mcp_healthy(compose_path: Path) -> None:
     svc = _load_ooda_agent(compose_path)
     depends = svc["depends_on"]
-    assert "kali" in depends
     assert depends["kali"]["condition"] == "service_healthy"
+    assert depends["playwright-mcp"]["condition"] == "service_healthy"
     assert "api" not in depends, "ya no hay servicio api"
 
 
-def test_ooda_agent_no_published_ports(compose_path: Path) -> None:
+def test_playwright_mcp_has_no_published_ports(compose_path: Path) -> None:
+    svc = _load_services(compose_path)["playwright-mcp"]
+    assert "ports" not in svc, "el MCP del navegador no se publica al host (red interna)"
+
+
+def test_ooda_agent_publishes_api_server_port(compose_path: Path) -> None:
+    # El API server de Hermes (:8642) se publica al host para pilotarlo desde un asistente
+    # externo (ver README "Pilotar Hermes desde un asistente externo"). El puerto del host es
+    # configurable con HERMES_API_HOST_PORT (default 8642); el del contenedor es 8642.
     svc = _load_ooda_agent(compose_path)
-    assert "ports" not in svc, "el driver OODA no publica puertos al host (red interna)"
+    ports = svc.get("ports", [])
+    assert ports, "ooda-agent debe publicar el API server (:8642) al host"
+    mapped = [str(p) for p in ports]
+    assert any("8642" in p for p in mapped), f"debe mapear el :8642 del contenedor (ports={mapped})"
 
 
 def test_ooda_agent_interactive_tty(compose_path: Path) -> None:

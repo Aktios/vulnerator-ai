@@ -67,7 +67,7 @@ def test_get_with_token_returns_bytes(server):
 
 
 def test_get_large_blob_over_1mib_streams_chunked(server):
-    """GATE N23: un blob > 1 MiB se sirve por stream chunked, idéntico byte a byte.
+    """Un blob > 1 MiB se sirve por stream chunked, idéntico byte a byte.
 
     Es justo lo que el evento SSE único (tope 1 048 576 B) no podía entregar.
     """

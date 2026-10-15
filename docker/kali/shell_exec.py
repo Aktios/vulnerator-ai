@@ -1,10 +1,10 @@
 """Runner de SHELL CRUDA de la Kali (STDLIB PURA) — ejecuta un comando arbitrario.
 
-Rol (architecture §1/§5): es la LÓGICA testeable del runner ``kali_exec`` que expone
-``kali_mcp_server`` como ``@mcp.tool`` NO BLOQUEANTE. Igual que ``aws_exec`` /
-``collector_runner`` / ``tool_streaming``, vive en un módulo aparte que usa SOLO la
-librería estándar (sin ``mcp``) para poder cubrirse con tests unitarios en el venv de
-dev, donde el SDK no está instalado.
+Es la LÓGICA testeable del runner ``kali_exec`` que expone ``kali_mcp_server`` como
+``@mcp.tool`` NO BLOQUEANTE. Igual que ``aws_exec`` / ``collector_runner`` /
+``tool_streaming``, vive en un módulo aparte que usa SOLO la librería estándar (sin
+``mcp``) para poder cubrirse con tests unitarios en el venv de dev, donde el SDK no
+está instalado.
 
 Qué es (decisión del operador): a diferencia de los runners deterministas y acotados
 (``iam_enum``/``iam_simulate``/``prowler``), ``kali_exec`` da al bucle OODA una SHELL
@@ -13,12 +13,10 @@ conductor pueda encadenar con pipes, redirecciones, escribir y correr sus propio
 scripts, invocar cualquier herramienta instalada en la imagen Kali, etc. NO valida ni
 restringe el comando: es intencionadamente genérico (shell cruda).
 
-Guardarraíles que NO desaparecen (importante): la autorización NO vive aquí. El scope,
-el consentimiento y la auditoría los sigue aplicando el CORE de PentAgent ANTES de que
-esta tool se invoque (el bucle OODA llega por ``execute_step`` -> executor del core ->
-``McpToolExecutor.invoke`` bajo scope-guard + gate de intrusividad + audit). Este módulo
-solo EJECUTA lo que el core ya autorizó. El comando y su salida son DATO NO CONFIABLE
-(F0.8): se transportan verbatim, nunca se interpreta la salida.
+Autorización: NO vive aquí. Este producto no tiene gates de scope, consentimiento ni
+auditoría; la responsabilidad del alcance recae enteramente en el operador. Este módulo
+solo EJECUTA el comando recibido. El comando y su salida son DATO NO CONFIABLE: se
+transportan verbatim, nunca se interpreta la salida.
 
 Flujo (igual que ``aws_exec``, patrón no-bloqueante del servidor): ``run_shell`` crea un
 tmpdir de trabajo efímero, ejecuta ``sh -c <command>`` con
@@ -74,8 +72,7 @@ def _ring_output(execution_id: str) -> str:
 
     A diferencia de ``aws_exec`` (que lee un fichero de salida estructurado), la shell
     cruda no produce un documento fijo: su resultado ES su stdout/stderr. Se devuelve el
-    contenido del ring como ``output`` para que el executor del core lo stagee en el
-    plano de DATOS. Dato NO confiable: verbatim, nunca interpretado.
+    contenido del ring como ``output``. Dato NO confiable: verbatim, nunca interpretado.
     """
     page = tool_streaming.read(execution_id, 0)
     lines = page.get("lines", [])
@@ -103,8 +100,7 @@ def run_shell(
         - ``{'status':'cancelled','cancelled':True,'returncode':rc}`` si se canceló.
         - ``{'status':'failed','returncode':-1,'error':...}`` si ``command`` es inválido.
 
-    ``output`` y ``error`` son DATO NO CONFIABLE (verbatim). El JSON/salida crudos los
-    stagea el EXECUTOR del core en el plano de DATOS; aquí NO se stagea artefacto.
+    ``output`` y ``error`` son DATO NO CONFIABLE (verbatim); aquí NO se stagea artefacto.
     """
     try:
         cmd_str = _validate_command(command)

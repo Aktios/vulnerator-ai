@@ -1,4 +1,4 @@
-"""Fixtures de los tests declarativos de agent-ooda (perfil Hermes OODA directo a Kali, FEAT-003).
+"""Fixtures de los tests declarativos de agent-ooda (perfil Hermes OODA directo a Kali).
 
 Resuelven las rutas de los ficheros a parsear RELATIVAS a la raíz del worktree (dos niveles
 por encima de este fichero: agent-ooda/tests/ -> raíz), para que `pytest agent-ooda/tests/`

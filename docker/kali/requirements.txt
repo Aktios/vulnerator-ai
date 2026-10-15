@@ -1,6 +1,5 @@
-# Manifiesto de dependencias de la imagen Kali de PentAgent (F0.7 — un manifiesto
-# por paquete, sincronizado). Este archivo es la fuente de verdad de lo que se
-# instala con pip en la imagen docker/kali/Dockerfile.
+# Manifiesto de dependencias de la imagen Kali. Este archivo es la fuente de verdad
+# de lo que se instala con pip en la imagen docker/kali/Dockerfile.
 #
 # Prowler: runtime determinista de recolección de postura AWS (read-only).
 #   Paquete Python puro -> compatible arm64 y amd64. Requiere Python >=3.10,<3.14
@@ -10,25 +9,23 @@ prowler==5.44.0
 
 # SDK oficial de MCP (modelcontextprotocol/python-sdk). Lo usa el SERVIDOR
 #   kali-mcp (docker/kali/kali_mcp_server.py: FastMCP + transporte streamable-HTTP)
-#   que corre dentro del contenedor y que pentagent-core consume como cliente.
+#   que corre dentro del contenedor.
 #
-#   Se fija a la línea 1.x (<2) a propósito: el cliente de pentagent-core usa la
-#   API 1.x (`mcp.client.streamable_http.streamablehttp_client`, `ClientSession`),
-#   que v2 renombra/elimina. Mantener ambos lados en la misma era de protocolo
-#   evita un desajuste cliente/servidor. Ver pentagent_core/tools/kali_mcp.py.
+#   Se fija a la línea 1.x (<2) a propósito: el servidor usa la API 1.x de FastMCP,
+#   que v2 renombra/elimina. Mantener el servidor y sus clientes en la misma era de
+#   protocolo evita un desajuste cliente/servidor.
 mcp>=1.28,<2
 
 # anyio: dependencia del transporte asíncrono del SDK mcp (streamable-HTTP).
 anyio>=4
 
-# ScoutSuite y Cloudsplaining (fuentes de collection EN VIVO adicionales, N33/N32) NO van
-# aquí: se instalan AISLADAS con pipx (venv propio por herramienta) en el Dockerfile.
+# ScoutSuite y Cloudsplaining (fuentes de collection EN VIVO adicionales) NO van aquí: se
+# instalan AISLADAS con pipx (venv propio por herramienta) en el Dockerfile.
 #
 # Motivo (causa raíz, verificada): kali-mcp invoca estas tools como SUBPROCESOS (argv), NO
 # las importa como librerías; meterlas en el MISMO venv que Prowler rompe la resolución de
 # dependencias — p. ej. prowler fija `python-dateutil==2.9.0.post0` y ScoutSuite exige
 # `python-dateutil<2.8.1`, conflicto irreconciliable que tumbaría el build entero. Aislar
-# cada tool (patrón correcto para ejecutables independientes) elimina el acoplamiento
-# artificial "todas en un venv" (architecture-first: límites que escalan, no se fuerzan).
+# cada tool (patrón correcto para ejecutables independientes) elimina el acoplamiento.
 # La disciplina fail-closed se mantiene: si una tool no instala/arranca, server_info la
-# reporta ausente y su collection falla claro (R3.2/4.4). Ver docker/kali/Dockerfile.
+# reporta ausente y su collection falla claro. Ver docker/kali/Dockerfile.

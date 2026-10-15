@@ -105,7 +105,7 @@ def test_timeout_kills_process_group_no_orphans() -> None:
     elapsed = time.monotonic() - start
 
     assert timed_out is True
-    # Un timeout NO es una cancelación: son estados distinguibles (N22.2).
+    # Un timeout NO es una cancelación: son estados distinguibles.
     assert cancelled is False
     # No debe esperar los 60s: el timeout de 1s mató el grupo con margen.
     assert elapsed < 20

@@ -1,27 +1,24 @@
-"""Script THIN de simulación de permisos efectivos IAM (read-only) para el foso (inc4b).
+"""Script de simulación de permisos efectivos IAM (read-only).
 
-Rol (architecture §1/§5 — plano de DATOS): BINARIO determinista que corre en el venv del
-servidor Kali (boto3 llega vía Prowler). NO decide nada: dado UN principal IAM concreto,
-comprueba con ``iam:SimulatePrincipalPolicy`` (API AWS **READ-ONLY**: NO modifica estado)
-si ese principal PUEDE ejecutar un conjunto FIJO de acciones de privesc clásicas, y escribe
-UN único documento JSON en la ruta de ``--out``. El runner STDLIB (``aws_simulate.py``) lo
-invoca como subproceso con ``tool_streaming`` (kill de grupo/timeout, logs al ring) y stagea
-su salida como artefacto; el crudo viaja por el plano de DATOS, nunca inline por el CONTROL.
+BINARIO determinista que corre en el venv del servidor Kali (boto3 llega vía Prowler). NO
+decide nada: dado UN principal IAM concreto, comprueba con ``iam:SimulatePrincipalPolicy``
+(API AWS **READ-ONLY**: NO modifica estado) si ese principal PUEDE ejecutar un conjunto FIJO
+de acciones de privesc clásicas, y escribe UN único documento JSON en la ruta de ``--out``.
+El runner STDLIB (``aws_simulate.py``) lo invoca como subproceso con ``tool_streaming``
+(kill de grupo/timeout, logs al ring).
 
 Es el ANÁLOGO per-candidato de ``aws_iam_enum.py`` (que es recon account-wide): aquí se
-confirma la EXPLOTABILIDAD efectiva de un principal, más fuerte que la mera enumeración. El
-salto a ``EXPLOITED``/E4 NO lo decide este script ni el bucle: lo decide el confirmador de
-dominio AWS en el core (inc4c), que leerá estas decisiones.
+confirma la EXPLOTABILIDAD efectiva de un principal, más fuerte que la mera enumeración.
 
-Disciplina de seguridad (R3/R4, scope-notes):
+Disciplina de seguridad:
   - READ-ONLY: ``SimulatePrincipalPolicy`` SIMULA la evaluación de políticas; NO ejecuta las
     acciones ni cambia el estado de la cuenta. Las credenciales read-only vienen del entorno
-    del contenedor (igual que Prowler/ScoutSuite); el scope ya lo validó el core ANTES de invocar.
+    del contenedor (igual que Prowler/ScoutSuite).
   - FAIL-CLOSED: si el propio ``SimulatePrincipalPolicy`` devuelve ``AccessDenied`` (o cualquier
     otro error del cliente), NO se revienta con un traceback: se escribe un JSON con un ``error``
-    claro y ``simulation`` vacío, y el runner lo surfacea como fallo (dato NO confiable, F0.8).
+    claro y ``simulation`` vacío, y el runner lo surfacea como fallo (dato NO confiable).
 
-THIN a propósito (N13 KISS): sin lógica que pida test unitario; la mecánica testeable
+THIN a propósito (KISS): sin lógica que pida test unitario; la mecánica testeable
 (construcción del comando, ejecución, lectura de salida, diagnóstico) vive en
 ``aws_simulate.py`` (STDLIB puro). Este fichero solo se valida con ``ast.parse`` (no se
 importa en los tests: boto3 no está en el venv de dev).

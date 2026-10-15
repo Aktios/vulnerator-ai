@@ -1,4 +1,4 @@
-"""Tests stdlib-only del runner AWS del simulate (`aws_simulate.py`, inc4b).
+"""Tests stdlib-only del runner AWS del simulate (`aws_simulate.py`).
 
 Espejo de ``test_aws_exec``: ejercitan la LÓGICA del runner SIN boto3 ni el script real
 (``aws_iam_simulate.py`` no se importa: boto3 no está en el venv de dev; se valida con
@@ -112,7 +112,7 @@ def test_run_iam_simulate_done_with_readable_output(monkeypatch):
     result = aws_simulate.run_iam_simulate(ACCOUNT, PRINCIPAL, "exec-ok")
     assert result["status"] == "done"
     assert result["returncode"] == 0
-    # El 'output' es el JSON crudo verbatim (lo stagea el executor del core, no aquí).
+    # El 'output' es el JSON crudo verbatim (viaja inline, no se stagea aquí).
     assert json.loads(result["output"]) == document
 
 
@@ -146,7 +146,7 @@ def test_run_iam_simulate_access_denied_structured_error_is_failed(monkeypatch):
     )
     result = aws_simulate.run_iam_simulate(ACCOUNT, PRINCIPAL, "exec-denied")
     assert result["status"] == "failed"
-    # El error del simulate se propaga VERBATIM (dato NO confiable, F0.8).
+    # El error del simulate se propaga VERBATIM (dato NO confiable).
     assert "AccessDenied" in result["error"]
 
 

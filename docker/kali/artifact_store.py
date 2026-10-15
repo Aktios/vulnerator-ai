@@ -1,19 +1,19 @@
 """Staging EFÍMERO de artefactos de `kali-mcp` (STDLIB PURA).
 
-El plano de DATOS en el lado del runner (architecture §4/§5). Cuando una tool
-termina, su resultado CRUDO se **stagea** aquí indexado por ``execution_id`` y se
-SIRVE por HTTP (ver ``artifact_http.py``); el core lo baja por stream a su almacén
-PERSISTENTE y autoritativo. Este staging es efímero (vive en el contenedor Kali):
-no es la fuente de verdad, sólo el punto de entrega del dato grande SIN que viaje
-por el canal de control (MCP) — la refundación del puente SSE de 1 MiB (N23).
+El plano de DATOS en el lado del runner. Cuando una tool termina, su resultado CRUDO se
+**stagea** aquí indexado por ``execution_id`` y se SIRVE por HTTP (ver
+``artifact_http.py``); el cliente lo baja por stream a su almacén persistente. Este
+staging es efímero (vive en el contenedor Kali): no es la fuente de verdad, sólo el
+punto de entrega del dato grande SIN que viaje por el canal de control (MCP), evitando
+el límite de 1 MiB de un único evento SSE.
 
-Por qué un módulo aparte, igual que ``tool_streaming.py`` (N13 + testeabilidad):
+Por qué un módulo aparte, igual que ``tool_streaming.py`` (testeabilidad):
 ``kali_mcp_server.py`` importa ``mcp``/``anyio`` (no están en el venv de dev). Esta
 mecánica usa SOLO la librería estándar, así se cubre con tests sin el SDK.
 
-Disciplina de seguridad (F0.8): el blob es DATO NO CONFIABLE (salida verbatim de una
-tool contra un target real). Aquí se TRANSPORTA y PERSISTE verbatim; nunca se
-interpreta. Las rutas se CONFINAN bajo la raíz (sin ``..``/separadores) para que un
+Disciplina de seguridad: el blob es DATO NO CONFIABLE (salida verbatim de una tool
+contra un target real). Aquí se TRANSPORTA y PERSISTE verbatim; nunca se interpreta.
+Las rutas se CONFINAN bajo la raíz (sin ``..``/separadores) para que un
 ``execution_id``/``name`` manipulado no escape del directorio de staging.
 """
 
@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 # Raíz del staging. Configurable por entorno; default `/artifacts` (dir del contenedor
-# Kali, efímero). El core lee por HTTP, no por FS compartido.
+# Kali, efímero). El cliente lee por HTTP, no por FS compartido.
 _DEFAULT_ROOT = "/artifacts"
 
 _META_NAME = "meta.json"
@@ -150,7 +150,7 @@ def _stage_stream(
     """Escribe un stream de chunks al destino confinado (tmp+replace) -> (size, sha256).
 
     Calcula tamaño + sha256 sobre la marcha, sin materializar el artefacto entero en
-    RAM (clave para resultados grandes, N23).
+    RAM (clave para resultados grandes).
     """
     dest = resolve(execution_id, name)
     dest.parent.mkdir(parents=True, exist_ok=True)

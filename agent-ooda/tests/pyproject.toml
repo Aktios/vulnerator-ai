@@ -1,4 +1,4 @@
-# Runner de tests del perfil Hermes / compose (OODA directo a Kali, FEAT-003).
+# Runner de tests del perfil Hermes / compose (OODA directo a Kali).
 # No es un paquete instalable: solo configura pytest para los tests declarativos de
 # agent-ooda (parseo de config.yaml y docker-compose.yml). Requiere PyYAML.
 [tool.pytest.ini_options]

@@ -1,22 +1,20 @@
-"""Script THIN de enumeración IAM read-only para el runner AWS del foso (F2).
+"""Script de enumeración IAM read-only para el runner AWS.
 
-Rol (architecture §1/§5 — plano de DATOS): es el BINARIO determinista que corre en
-el venv del servidor Kali (boto3 llega vía Prowler). NO decide nada: enumera IAM de
-forma ACOTADA y SOLO-LECTURA y escribe UN único documento JSON en la ruta de ``--out``.
-El runner STDLIB (``aws_exec.py``) lo invoca como subproceso con ``tool_streaming``
-(kill de grupo/timeout, logs al ring) y stagea su salida como artefacto; el crudo viaja
-por el plano de DATOS, nunca inline por el CONTROL.
+BINARIO determinista que corre en el venv del servidor Kali (boto3 llega vía Prowler). NO
+decide nada: enumera IAM de forma ACOTADA y SOLO-LECTURA y escribe UN único documento JSON
+en la ruta de ``--out``. El runner STDLIB (``aws_exec.py``) lo invoca como subproceso con
+``tool_streaming`` (kill de grupo/timeout, logs al ring).
 
-Disciplina de seguridad (R3/R4, scope-notes):
+Disciplina de seguridad:
   - READ-ONLY: SOLO ``list_*``/``get_*``. NUNCA create/put/attach/delete: no cambia el
     estado de la cuenta AWS. Las credenciales read-only vienen del entorno del contenedor
-    (igual que Prowler/ScoutSuite), el scope ya lo validó el core ANTES de invocar.
+    (igual que Prowler/ScoutSuite).
   - ACOTADO: enumera roles/usuarios/grupos/políticas (ámbito ``Local`` = gestionadas por
     el cliente) con nombres+ARNs y relaciones de adjunción. NO vuelca
     ``get-account-authorization-details`` completo (eso es trabajo de Cloudsplaining):
     aquí se busca el mapa IAM para el bucle OODA, no el dump exhaustivo de documentos.
 
-THIN a propósito (N13 KISS): sin lógica que pida test unitario; la mecánica testeable
+THIN a propósito (KISS): sin lógica que pida test unitario; la mecánica testeable
 (construcción del comando, ejecución, lectura de salida, diagnóstico) vive en
 ``aws_exec.py`` (STDLIB puro). Este fichero solo se valida con ``ast.parse`` (no se
 importa en los tests: boto3 no está en el venv de dev).

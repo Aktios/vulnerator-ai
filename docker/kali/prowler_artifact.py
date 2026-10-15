@@ -4,12 +4,12 @@ Vive aparte de ``kali_mcp_server.py`` (que importa ``mcp``/``anyio``, no instala
 el venv de dev) para poder cubrir con tests el camino post-escaneo SIN el SDK, igual
 que ``tool_streaming.py``/``artifact_store.py``.
 
-Qué hace al terminar un escaneo (architecture §5, pasos 5-6):
+Qué hace al terminar un escaneo:
   1. Localiza y lee el fichero OCSF/JSON crudo que Prowler escribió en ``outdir``.
-  2. **Puente de compat (N21):** guarda los findings paginables con
+  2. **Puente de compat:** guarda los findings paginables con
      ``tool_streaming.set_findings`` para que ``read_scan_findings`` siga sirviéndolos
-     si el core es antiguo o no tiene configurado el plano de datos.
-  3. **Plano de DATOS (N23):** stagea el fichero CRUDO como artefacto
+     si el plano de datos no está configurado.
+  3. **Plano de DATOS:** stagea el fichero CRUDO como artefacto
      (``artifact_store.put_file``) y construye el ``done`` del control con una
      **referencia** (``artifact``) pequeña — NUNCA los findings inline.
 
@@ -72,8 +72,8 @@ def _stage_artifact(
     """Stagea el fichero crudo como artefacto y devuelve la ref para el ``done``.
 
     Best-effort: si el staging falla (p. ej. FS no escribible), devuelve ``None`` y el
-    worker publica el ``done`` sin ``artifact`` ref — el core cae entonces al puente
-    ``read_scan_findings`` (compat). El plano de datos no debe tumbar el escaneo.
+    worker publica el ``done`` sin ``artifact`` ref — se cae entonces al puente
+    ``read_scan_findings``. El plano de datos no debe tumbar el escaneo.
     """
     meta = {
         "tool": "prowler",
@@ -116,7 +116,7 @@ def finalize_scan(
     if findings is None or path is None:
         return None
 
-    # Puente de compat (N21): findings paginables disponibles ANTES de publicar done.
+    # Puente de compat: findings paginables disponibles ANTES de publicar done.
     tool_streaming.set_findings(execution_id, findings)
 
     done: dict[str, Any] = {
