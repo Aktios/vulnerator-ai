@@ -1,25 +1,25 @@
 # =============================================================================
-# vulnerator-ai — OODA pentest con Hermes hablando DIRECTO a Kali-MCP.
+# vulnerator-ai — OODA pentest with Hermes talking DIRECTLY to Kali-MCP.
 # =============================================================================
-# Qué es: un bucle OODA de pentest conducido por Hermes (nousresearch/hermes-agent)
-# que ejecuta herramientas DIRECTAMENTE vía servidores MCP (sin core/API/UI intermedios):
-#   - kali          : runtime determinista de tools de pentest (kali-mcp en :8900).
-#   - playwright-mcp : navegador real (Chromium headless) por MCP (:8931) para la parte web.
-#   - ooda-agent    : Hermes como CEREBRO conductor del bucle OODA, cliente de ambos MCP
-#                     (kali:8900, playwright-mcp:8931). Driver del OODA, sin intermediarios.
+# What it is: an OODA pentest loop driven by Hermes (nousresearch/hermes-agent)
+# that runs tools DIRECTLY via MCP servers (no intermediate core/API/UI):
+#   - kali          : deterministic pentest tool runtime (kali-mcp on :8900).
+#   - playwright-mcp : real browser (headless Chromium) over MCP (:8931) for the web part.
+#   - ooda-agent    : Hermes as the BRAIN driving the OODA loop, client of both MCPs
+#                     (kali:8900, playwright-mcp:8931). OODA driver, no intermediaries.
 #
-# Arranque:
-#   cp .env.example .env   # y rellena OPENROUTER_API_KEY y HERMES_API_SERVER_KEY
+# Startup:
+#   cp .env.example .env   # and fill in OPENROUTER_API_KEY and HERMES_API_SERVER_KEY
 #   docker compose up -d --build
-#   docker compose exec -it ooda-agent hermes chat   # TUI interactivo
+#   docker compose exec -it ooda-agent hermes chat   # interactive TUI
 #
-# ADVERTENCIA (intencional): este producto NO tiene scope-guard, consentimiento ni
-# audit. Hermes ejecuta lo que decida directamente contra el objetivo, sin portero
-# que valide el alcance. Úsalo SOLO contra targets explícitamente autorizados y en un
-# entorno controlado. La responsabilidad del alcance recae enteramente en el operador.
+# WARNING (intentional): this product has NO scope-guard, consent, or
+# audit. Hermes runs whatever it decides directly against the target, with no gatekeeper
+# validating the scope. Use it ONLY against explicitly authorized targets and in a
+# controlled environment. Responsibility for the scope rests entirely with the operator.
 #
-# Multi-arch: cada build declara platforms [linux/arm64, linux/amd64]. En Mac M2
-# se ejecuta arm64 nativo.
+# Multi-arch: each build declares platforms [linux/arm64, linux/amd64]. On a Mac M2
+# it runs arm64 natively.
 
 services:
   kali:
@@ -31,34 +31,34 @@ services:
         - linux/amd64
     image: vulnerator-ai-kali:dev
     environment:
-      # --- AWS read-only (OPCIONAL en este producto) ---
-      # Prowler/ScoutSuite/Cloudsplaining corren DENTRO de este contenedor. Si se van
-      # a usar las tools de recolección cloud, define estas credenciales en .env; si no,
-      # quedan vacías y las tools cloud simplemente no tendrán con qué autenticar.
+      # --- AWS read-only (OPTIONAL in this product) ---
+      # Prowler/ScoutSuite/Cloudsplaining run INSIDE this container. If you are going
+      # to use the cloud collection tools, set these credentials in .env; otherwise
+      # they stay empty and the cloud tools simply won't have anything to authenticate with.
       AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
       AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
-      # Opcional: solo para credenciales temporales (STS).
+      # Optional: only for temporary credentials (STS).
       AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
       AWS_REGION: "${AWS_REGION:-us-east-1}"
-      # Puerto del servidor kali-mcp dentro del contenedor. Overridable sin reconstruir.
+      # kali-mcp server port inside the container. Overridable without rebuilding.
       KALI_MCP_PORT: "8900"
-      # --- Plano de DATOS de artefactos (puerto dedicado, red interna) ---
+      # --- Artifacts DATA plane (dedicated port, internal network) ---
       KALI_ARTIFACTS_PORT: "8901"
-      # Token compartido del canal de datos (opcional en este producto).
+      # Shared token for the data channel (optional in this product).
       KALI_ARTIFACTS_TOKEN: "${KALI_ARTIFACTS_TOKEN:-}"
-      # --- Prowler (opcional): acota el escaneo cloud si se usa ---
+      # --- Prowler (optional): scopes the cloud scan if used ---
       PROWLER_STATUS: "${PROWLER_STATUS:-FAIL}"
       PROWLER_REGIONS: "${PROWLER_REGIONS-${AWS_REGION:-us-east-1}}"
       PROWLER_SERVICES: "${PROWLER_SERVICES-iam s3}"
       PROWLER_TIMEOUT: "${PROWLER_TIMEOUT:-1800}"
-    # Puerto del servidor kali-mcp (expuesto para inspección directa desde el host si
-    # hace falta; ooda-agent lo alcanza por la red interna como kali:8900). El puerto del
-    # host es configurable con KALI_MCP_HOST_PORT (default 8900) sin editar este fichero;
-    # el puerto interno del contenedor sigue siendo 8900.
+    # kali-mcp server port (exposed for direct inspection from the host if
+    # needed; ooda-agent reaches it over the internal network as kali:8900). The host
+    # port is configurable with KALI_MCP_HOST_PORT (default 8900) without editing this file;
+    # the container's internal port stays 8900.
     ports:
       - "${KALI_MCP_HOST_PORT:-8900}:8900"
-    # HEALTHCHECK: comprueba que el servidor MCP acepta conexiones TCP en :8900, para
-    # que ooda-agent pueda depender con condition: service_healthy antes de arrancar.
+    # HEALTHCHECK: checks that the MCP server accepts TCP connections on :8900, so that
+    # ooda-agent can depend on it with condition: service_healthy before starting.
     healthcheck:
       test: ["CMD", "python", "-c", "import socket,sys; s=socket.socket(); s.settimeout(3); sys.exit(0 if s.connect_ex(('localhost',8900))==0 else 1)"]
       interval: 10s
@@ -68,80 +68,80 @@ services:
     restart: unless-stopped
 
   ooda-agent:
-    # Imagen oficial de registry (NO se construye desde este repo).
+    # Official registry image (NOT built from this repo).
     image: nousresearch/hermes-agent
-    # Arranque (modelo "perfil default"): recrea el perfil DEFAULT (/opt/data) copiando
-    # la plantilla declarativa del repo (bind-mount read-only en /opt/profile-src),
-    # inyecta la key del API server y arranca el gateway en foreground. 'hermes gateway
-    # run' mantiene el contenedor VIVO y arranca platforms.api_server (:8642, publicado al
-    # host vía el bloque 'ports:' de abajo para pilotar Hermes desde un asistente externo).
+    # Startup ("default profile" model): recreates the DEFAULT profile (/opt/data) by copying
+    # the repo's declarative template (read-only bind-mount at /opt/profile-src),
+    # injects the API server key and starts the gateway in the foreground. 'hermes gateway
+    # run' keeps the container ALIVE and starts platforms.api_server (:8642, published to the
+    # host via the 'ports:' block below to drive Hermes from an external assistant).
     command:
       - sh
       - -c
       - |
         set -e
-        # El perfil DEFAULT es el home raíz /opt/data (no /opt/data/profiles/<p>).
+        # The DEFAULT profile is the root home /opt/data (not /opt/data/profiles/<p>).
         DEF=/opt/data
-        # (a) copia la plantilla declarativa (config/SOUL/skills) al home del perfil default.
+        # (a) copy the declarative template (config/SOUL/skills) to the default profile home.
         mkdir -p "$$DEF/skills"
         cp /opt/profile-src/profile/config.yaml "$$DEF/config.yaml"
         cp /opt/profile-src/profile/SOUL.md "$$DEF/SOUL.md"
         cp -r /opt/profile-src/skills/. "$$DEF/skills/" 2>/dev/null || true
-        # (b) inyecta la KEY del API server (secreto, no se versiona) ANTES de arrancar.
+        # (b) inject the API server KEY (secret, not versioned) BEFORE starting.
         hermes config set platforms.api_server.key "$$HERMES_API_SERVER_KEY" >/dev/null
-        # (c) arranca el gateway del perfil default: foreground (contenedor vivo) + API server.
+        # (c) start the default profile gateway: foreground (live container) + API server.
         exec hermes gateway run
     environment:
-      # Clave del API server de Hermes — obligatoria (fail-closed): mín 8 chars. Hacen
-      # falta DOS vías: el command la escribe en platforms.api_server.key (arrancar el
-      # API server) y API_SERVER_KEY la valida en cada petición (autenticar el Bearer).
+      # Hermes API server key — required (fail-closed): min 8 chars. TWO paths are
+      # needed: the command writes it into platforms.api_server.key (to start the
+      # API server) and API_SERVER_KEY validates it on every request (to authenticate the Bearer).
       HERMES_API_SERVER_KEY: "${HERMES_API_SERVER_KEY:?Falta HERMES_API_SERVER_KEY - genera uno con 'openssl rand -hex 32' (min 8 chars) y ponlo en .env}"
       API_SERVER_KEY: "${HERMES_API_SERVER_KEY}"
-      # API key del proveedor LLM de Hermes. Hermes lee la key del LLM de ESTA env var
-      # (OPENROUTER_API_KEY), por eso NO se declara HERMES_LLM_API_KEY. Obligatoria
-      # fail-closed: sin ella el agente no puede razonar.
+      # API key for Hermes' LLM provider. Hermes reads the LLM key from THIS env var
+      # (OPENROUTER_API_KEY), which is why HERMES_LLM_API_KEY is NOT declared. Required
+      # fail-closed: without it the agent cannot reason.
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:?Falta OPENROUTER_API_KEY - define la API key de OpenRouter en .env}"
     volumes:
-      # VOLUMEN CON NOMBRE OBLIGATORIO (nunca bind-mount): el state.db SQLite en modo WAL
-      # de Hermes SE CORROMPE en bind-mounts que cruzan la VM de macOS (virtiofs).
+      # NAMED VOLUME REQUIRED (never a bind-mount): Hermes' state.db SQLite in WAL mode
+      # GETS CORRUPTED on bind-mounts that cross the macOS VM (virtiofs).
       - hermes-data:/opt/data
-      # Plantilla declarativa del perfil, READ-ONLY y FUERA de /opt/data (no toca el WAL).
+      # Declarative profile template, READ-ONLY and OUTSIDE /opt/data (does not touch the WAL).
       - ./agent-ooda:/opt/profile-src:ro
-    # TUI interactivo: 'docker compose exec -it ooda-agent hermes chat' necesita stdin+tty.
+    # Interactive TUI: 'docker compose exec -it ooda-agent hermes chat' needs stdin+tty.
     stdin_open: true
     tty: true
-    # Publica el API server OpenAI-compatible de Hermes (:8642) al host para poder PILOTAR
-    # Hermes desde un asistente externo (Kiro/Claude) por HTTP, sin entrar al TUI. El puerto
-    # del host es configurable con HERMES_API_HOST_PORT (default 8642) sin editar este fichero;
-    # el puerto interno del contenedor sigue siendo 8642.
+    # Publishes Hermes' OpenAI-compatible API server (:8642) to the host so you can DRIVE
+    # Hermes from an external assistant (Kiro/Claude) over HTTP, without entering the TUI. The host
+    # port is configurable with HERMES_API_HOST_PORT (default 8642) without editing this file;
+    # the container's internal port stays 8642.
     #
-    # SEGURIDAD: publicar este puerto BAJA la barrera de red que el stack tenía a propósito
-    # (antes el :8642 solo era accesible por la red interna de docker). A partir de aquí la
-    # protección del endpoint es el Bearer HERMES_API_SERVER_KEY (misma key del .env): úsalo
-    # SOLO en máquina/entorno controlado. Si no quieres abrir el puerto, borra este bloque
-    # 'ports:' y pilota Hermes con 'docker compose exec ooda-agent curl ...' (ver README).
+    # SECURITY: publishing this port LOWERS the network barrier the stack had on purpose
+    # (before, :8642 was only reachable over the internal docker network). From here on the
+    # endpoint's protection is the HERMES_API_SERVER_KEY Bearer (same key from .env): use it
+    # ONLY on a controlled machine/environment. If you don't want to open the port, delete this
+    # 'ports:' block and drive Hermes with 'docker compose exec ooda-agent curl ...' (see README).
     ports:
       - "${HERMES_API_HOST_PORT:-8642}:8642"
     depends_on:
-      # Espera a que kali esté healthy (MCP escuchando) antes de arrancar.
+      # Wait until kali is healthy (MCP listening) before starting.
       kali:
         condition: service_healthy
-      # Espera a que el MCP del navegador esté healthy antes de arrancar.
+      # Wait until the browser MCP is healthy before starting.
       playwright-mcp:
         condition: service_healthy
     restart: unless-stopped
-    # Red default del compose: alcanza kali:8900 y playwright-mcp:8931 por DNS interno.
+    # Default compose network: reaches kali:8900 and playwright-mcp:8931 via internal DNS.
 
   playwright-mcp:
-    # Segundo servidor MCP del stack: navegador real (Chromium headless) para la parte
-    # WEB del pentest. Imagen oficial de Microsoft (NO se construye desde este repo).
-    # Hermes lo registra como MCP `playwright` (ver agent-ooda/profile/config.yaml) y gana
-    # las tools `mcp_playwright_*` SIN reactivar ningún toolset nativo: sigue el principio
-    # "todo pasa por MCP". La parte web NO queda limitada a kali_run: nmap/whatweb/nuclei/
-    # ffuf/sqlmap van por la Kali (kali_run) y la navegación/DOM/XSS van por este MCP.
+    # Second MCP server of the stack: real browser (headless Chromium) for the
+    # WEB part of the pentest. Official Microsoft image (NOT built from this repo).
+    # Hermes registers it as the `playwright` MCP (see agent-ooda/profile/config.yaml) and gains
+    # the `mcp_playwright_*` tools WITHOUT re-enabling any native toolset: it follows the
+    # "everything goes through MCP" principle. The web part is NOT limited to kali_run: nmap/whatweb/nuclei/
+    # ffuf/sqlmap go through the Kali (kali_run) and navigation/DOM/XSS go through this MCP.
     image: mcr.microsoft.com/playwright/mcp
-    # HTTP (streamable-http) en :8931, endpoint MCP en /mcp. --no-sandbox: Chromium corre
-    # como root en el contenedor sin userns. --headless: sin display. Red interna solo.
+    # HTTP (streamable-http) on :8931, MCP endpoint at /mcp. --no-sandbox: Chromium runs
+    # as root in the container without userns. --headless: no display. Internal network only.
     entrypoint: ["node"]
     command:
       - /app/cli.js
@@ -153,32 +153,32 @@ services:
       - "8931"
       - --host
       - "0.0.0.0"
-      # Proteccion anti-DNS-rebinding del servidor Playwright: por defecto SOLO acepta el
-      # host al que esta bound (localhost), asi que rechaza con 403 la conexion de Hermes,
-      # que llega con el Host header `playwright-mcp:8931` (nombre DNS interno del servicio).
-      # Se permite EXPLICITAMENTE ese host (no `*`): mantiene la proteccion acotada a la red
-      # interna de docker, por la que llega ooda-agent.
+      # Playwright server anti-DNS-rebinding protection: by default it ONLY accepts the
+      # host it is bound to (localhost), so it rejects Hermes' connection with 403,
+      # which arrives with the Host header `playwright-mcp:8931` (the service's internal DNS name).
+      # That host is EXPLICITLY allowed (not `*`): it keeps the protection scoped to the
+      # internal docker network, from which ooda-agent connects.
       - --allowed-hosts
       - "playwright-mcp:8931"
-      # Perfil de navegador EN MEMORIA (no persistente en disco). Un perfil persistente SOLO
-      # puede usarlo UNA instancia a la vez y se BLOQUEA ("Browser is already in use ...") si
-      # queda un proceso Chrome huerfano o si hay llamadas concurrentes; eso dejaba inservibles
-      # las tools mcp_playwright_* a mitad de engagement. Con --isolated cada sesion arranca un
-      # perfil efimero propio: sin lock de perfil compartido.
+      # IN-MEMORY browser profile (not persisted to disk). A persistent profile can ONLY
+      # be used by ONE instance at a time and LOCKS ("Browser is already in use ...") if
+      # an orphan Chrome process remains or there are concurrent calls; that left the
+      # mcp_playwright_* tools unusable mid-engagement. With --isolated each session starts its
+      # own ephemeral profile: no shared profile lock.
       - --isolated
     init: true
-    # HEALTHCHECK: el endpoint MCP responde en :8931 (un proceso vivo responde al
-    # handshake HTTP), para que ooda-agent dependa con condition: service_healthy.
+    # HEALTHCHECK: the MCP endpoint responds on :8931 (a live process responds to the
+    # HTTP handshake), so that ooda-agent can depend on it with condition: service_healthy.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8931/mcp',r=>process.exit(r.statusCode?0:1)).on('error',()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 20s
-    # SIN sección ports: el MCP del navegador NO se publica al host; solo red interna docker.
+    # NO ports section: the browser MCP is NOT published to the host; internal docker network only.
     restart: unless-stopped
 
 volumes:
-  # Estado de Hermes (perfil + SQLite WAL). CON NOMBRE a propósito: evita el bind-mount
-  # que corrompe el SQLite WAL en virtiofs de macOS.
+  # Hermes state (profile + SQLite WAL). NAMED on purpose: avoids the bind-mount
+  # that corrupts the SQLite WAL on macOS virtiofs.
   hermes-data:

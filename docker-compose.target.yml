@@ -1,28 +1,28 @@
 # =============================================================================
-# docker-compose.target.yml — target web VULNERABLE A PROPOSITO para pruebas.
+# docker-compose.target.yml — DELIBERATELY VULNERABLE web target for testing.
 # =============================================================================
-# Override OPCIONAL para escenarios de prueba de la skill `web-pentest`. NO forma parte
-# del stack base (docker-compose.yml): se levanta explicitamente junto a el para tener un
-# objetivo contra el que practicar sin salir a internet ni tocar sistemas reales.
+# OPTIONAL override for test scenarios of the `web-pentest` skill. It is NOT part
+# of the base stack (docker-compose.yml): bring it up explicitly alongside it to have a
+# target to practice against without going out to the internet or touching real systems.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.target.yml up -d
 #
-# El target vive en la MISMA red interna del compose, asi que Hermes/Kali lo alcanzan por
-# su nombre DNS `juice-shop:3000`. NO se publica ningun puerto al host: el objetivo solo
-# existe dentro de la red de docker, acotando el ejercicio al entorno controlado.
+# The target lives on the SAME internal compose network, so Hermes/Kali reach it by
+# its DNS name `juice-shop:3000`. NO port is published to the host: the target only
+# exists inside the docker network, scoping the exercise to the controlled environment.
 #
-# OWASP Juice Shop: aplicacion web deliberadamente insegura (proyecto OWASP, MIT), el
-# estandar de facto para practicar pentest web (XSS, SQLi, auth, etc.).
+# OWASP Juice Shop: a deliberately insecure web application (OWASP project, MIT), the
+# de facto standard for practicing web pentesting (XSS, SQLi, auth, etc.).
 
 services:
   juice-shop:
     image: bkimminich/juice-shop
-    # SIN sección ports: el target NO se publica al host; solo es alcanzable por la red
-    # interna de docker (Hermes lo ve como http://juice-shop:3000). Mantiene el ejercicio
-    # confinado al entorno controlado.
+    # NO ports section: the target is NOT published to the host; it is only reachable over the
+    # internal docker network (Hermes sees it as http://juice-shop:3000). Keeps the exercise
+    # confined to the controlled environment.
     restart: unless-stopped
-    # Healthcheck: la raiz responde 200 cuando la app esta lista. La imagen trae node pero
-    # no curl/wget garantizados, asi que se usa node (siempre presente) para el sondeo.
+    # Healthcheck: the root responds 200 when the app is ready. The image ships node but
+    # not guaranteed curl/wget, so node (always present) is used for the probe.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 10s

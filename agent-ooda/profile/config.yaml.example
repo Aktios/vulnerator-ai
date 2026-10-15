@@ -1,29 +1,29 @@
-# config.yaml.example — variante documentada con placeholders.
-# Copia a config.yaml del perfil y ajusta si hace falta tras validar en vivo.
-# Sintaxis MCP verificada contra:
+# config.yaml.example — documented variant with placeholders.
+# Copy to the profile's config.yaml and adjust if needed after validating live.
+# MCP syntax verified against:
 #   https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/mcp.md
 
 model:
-  default: "mistralai/mistral-large-4-0"   # modelo de OpenRouter preparado para el pentest autorizado
+  default: "mistralai/mistral-large-4-0"   # OpenRouter model prepared for authorized pentesting
 
 mcp_servers:
   kali:
-    url: "http://kali:8900"                # MCP de la Kali (contenedor `kali`). SIN headers/token.
+    url: "http://kali:8900"                # Kali MCP (container `kali`). NO headers/token.
     tools:
-      # Whitelist de las tools reales del servidor kali-mcp (nombre tal como lo expone el servidor).
+      # Whitelist of the real kali-mcp server tools (name as exposed by the server).
       include: [kali_run, kali_exec, iam_enum, iam_simulate, get_scan_status, read_tool_logs, prowler_scan, record_finding, read_findings, server_info]
       prompts: false
       resources: false
   playwright:
-    url: "http://playwright-mcp:8931/mcp"  # MCP del navegador (Chromium headless) para la parte web.
+    url: "http://playwright-mcp:8931/mcp"  # Browser MCP (headless Chromium) for the web part.
     tools:
-      prompts: false                       # SIN include: se exponen las tools del navegador de la imagen.
+      prompts: false                       # NO include: the image's browser tools are exposed.
       resources: false
 
-# Dos toolsets: ambos MCP (Kali + navegador). CERO tools nativas (browser/web nativos desactivados).
+# Two toolsets: both MCPs (Kali + browser). ZERO native tools (native browser/web disabled).
 toolsets:
   - kali
   - playwright
 
 terminal:
-  backend: "local"            # Hermes no usa terminal nativa; ejecuta en la Kali via kali_run.
+  backend: "local"            # Hermes does not use a native terminal; it runs on the Kali via kali_run.
