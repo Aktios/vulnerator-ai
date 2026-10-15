@@ -20,7 +20,7 @@ Three containers (the agent and two MCP servers) and the agent driving end to en
 
 ## Architecture (3 containers)
 
-![vulnerator-ai architecture diagram: the pentester pilots Hermes from Claude Code over HTTP; Hermes drives the OODA loop (with ATT&CK as the Orient language) and runs directly on Kali and Playwright via MCP, reasoning with Mistral on OpenRouter.](docs/arquitectura.svg)
+![Vulnerator AI system architecture: an external assistant (Kiro/Claude) triggers and observes Hermes over HTTP (:8642, Bearer); Hermes is the OODA brain, reasoning with mistralai/mistral-large on OpenRouter and driving the kali-mcp (:8900) and playwright-mcp (:8931) servers over MCP; kali runs the pentest tools against the authorized target. ATT&CK is the Orient language of the loop.](docs/architecture.svg)
 
 - **kali** — deterministic runtime for pentest and collection tools (nmap, Prowler,
   ScoutSuite, Cloudsplaining, ...). Exposes a `kali-mcp` server on `:8900` (and the artifacts

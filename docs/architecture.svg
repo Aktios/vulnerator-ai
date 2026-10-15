@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="980" viewBox="0 0 1480 980" font-family="'Courier New', 'DejaVu Sans Mono', monospace">
+  <defs>
+    <!-- arrow markers -->
+    <marker id="aReq" markerWidth="12" markerHeight="12" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e8e8e8"/>
+    </marker>
+    <marker id="aEvt" markerWidth="12" markerHeight="12" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7f8c8d"/>
+    </marker>
+    <marker id="aLlm" markerWidth="12" markerHeight="12" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b03a3a"/>
+    </marker>
+    <marker id="aLoop" markerWidth="12" markerHeight="12" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#cfcfcf"/>
+    </marker>
+    <marker id="aTgt" markerWidth="13" markerHeight="13" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b03a3a"/>
+    </marker>
+
+    <!-- node glow -->
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- faint grid pattern (PCB vibe) -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0 H0 V40" fill="none" stroke="#141414" stroke-width="1"/>
+    </pattern>
+
+    <linearGradient id="bone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f2f2f2"/>
+      <stop offset="1" stop-color="#bdbdbd"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ===================== BACKDROP ===================== -->
+  <rect width="1480" height="980" fill="#000000"/>
+  <rect width="1480" height="980" fill="url(#grid)"/>
+  <rect x="8" y="8" width="1464" height="964" fill="none" stroke="#2a2a2a" stroke-width="1"/>
+
+  <!-- ===================== TITLE (death-metal flavor) ===================== -->
+  <text x="40" y="58" fill="#f2f2f2" font-size="34" font-weight="700" letter-spacing="4"
+        font-family="'Impact','Arial Black',sans-serif">&#8224; VULNERATOR AI &#8224;</text>
+  <text x="40" y="84" fill="#8a8a8a" font-size="13" letter-spacing="2">
+    SYSTEM ARCHITECTURE &#183; OODA pentest driven by Hermes &#183; piloted over HTTP from an external assistant</text>
+  <text x="40" y="104" fill="#5a5a5a" font-size="11" letter-spacing="1">
+    no core &#183; no REST facade &#183; no UI &#183; no scope-gate &#8212; the agent drives tools end to end over MCP</text>
+  <line x1="40" y1="116" x2="1440" y2="116" stroke="#2f2f2f" stroke-width="1"/>
+
+  <!-- ===================== OPERATOR COLUMN ===================== -->
+  <rect x="36" y="140" width="250" height="300" rx="6" fill="#0a0a0a" stroke="#4a4a4a" stroke-width="1.4"/>
+  <text x="161" y="166" fill="#8a8a8a" font-size="12" text-anchor="middle" letter-spacing="3">OPERATOR / HUMAN</text>
+
+  <!-- pentester glyph -->
+  <g transform="translate(161,214)">
+    <circle cx="0" cy="-14" r="18" fill="none" stroke="#cfcfcf" stroke-width="1.6"/>
+    <path d="M-26,34 a26,26 0 0 1 52,0 z" fill="none" stroke="#cfcfcf" stroke-width="1.6"/>
+    <path d="M-20,-24 q20,-14 40,0" fill="none" stroke="#cfcfcf" stroke-width="1.6"/>
+  </g>
+  <text x="161" y="268" fill="#e8e8e8" font-size="15" font-weight="700" text-anchor="middle">PENTESTER</text>
+
+  <!-- external assistant box -->
+  <rect x="60" y="296" width="202" height="128" rx="5" fill="#0d0d0d" stroke="#6a6a6a" stroke-width="1.3"/>
+  <text x="161" y="320" fill="#f2f2f2" font-size="13" font-weight="700" text-anchor="middle" letter-spacing="1">KIRO / CLAUDE</text>
+  <text x="161" y="338" fill="#8a8a8a" font-size="10" text-anchor="middle">external assistant (HTTP client)</text>
+  <line x1="76" y1="348" x2="246" y2="348" stroke="#2f2f2f"/>
+  <text x="161" y="366" fill="#b03a3a" font-size="10.5" text-anchor="middle" font-weight="700">TRIGGER &#183; OBSERVE &#183; SUMMARIZE</text>
+  <text x="161" y="384" fill="#7f8c8d" font-size="9.5" text-anchor="middle">does NOT reason the pentest</text>
+  <text x="161" y="400" fill="#7f8c8d" font-size="9.5" text-anchor="middle">sends engagement prompt,</text>
+  <text x="161" y="414" fill="#7f8c8d" font-size="9.5" text-anchor="middle">reads lifecycle events</text>
+
+  <!-- ===================== DOCKER HOST ===================== -->
+  <rect x="320" y="134" width="1120" height="620" rx="8" fill="#070707" stroke="#5a5a5a" stroke-width="1.6"/>
+  <text x="344" y="162" fill="#cfcfcf" font-size="14" font-weight="700" letter-spacing="1">DOCKER HOST &#183; docker-compose (internal project network)</text>
+  <text x="344" y="181" fill="#6a6a6a" font-size="10.5">one full stack per engagement &#183; isolate with  docker compose -p pentest-&lt;name&gt;  &#183; named volume: hermes-data (SQLite WAL)</text>
+
+  <!-- ==== ooda-agent / Hermes ==== -->
+  <rect x="344" y="200" width="470" height="470" rx="6" fill="#0b0b0b" stroke="#9a9a9a" stroke-width="1.6"/>
+  <text x="368" y="230" fill="#f2f2f2" font-size="17" font-weight="700" letter-spacing="1"
+        font-family="'Impact','Arial Black',sans-serif">OODA-AGENT</text>
+  <text x="368" y="249" fill="#8a8a8a" font-size="11">image: nousresearch/hermes-agent &#183; THE BRAIN of the OODA loop</text>
+  <text x="368" y="266" fill="#6a6a6a" font-size="10">cmd: hermes gateway run (keeps container alive + serves API)</text>
+
+  <!-- API server -->
+  <rect x="366" y="282" width="426" height="66" rx="4" fill="#101010" stroke="#b03a3a" stroke-width="1.4"/>
+  <text x="382" y="306" fill="#e8a0a0" font-size="13" font-weight="700">[::] OpenAI-compatible API SERVER &#183; :8642</text>
+  <text x="382" y="325" fill="#9a7a7a" font-size="10">POST /v1/runs &#183; GET /v1/runs/{id}/events (SSE) &#183; /steer &#183; /stop &#183; /health</text>
+  <text x="382" y="340" fill="#8a6a6a" font-size="9.5">auth: Authorization: Bearer $HERMES_API_SERVER_KEY (fail-closed, min 8 chars)</text>
+
+  <!-- declarative profile -->
+  <rect x="366" y="360" width="426" height="150" rx="4" fill="#0e0e0e" stroke="#6a6a6a" stroke-width="1.2"/>
+  <text x="382" y="382" fill="#cfcfcf" font-size="11.5" font-weight="700">DECLARATIVE PROFILE  (agent-ooda/ &#8594; /opt/data, bind-mount ro)</text>
+
+  <rect x="382" y="394" width="190" height="100" rx="4" fill="#141414" stroke="#4a4a4a"/>
+  <text x="396" y="414" fill="#e8e8e8" font-size="11" font-weight="700">prompts (layer 1-2)</text>
+  <text x="396" y="432" fill="#8a8a8a" font-size="9.5">SOUL.md &#8212; executor identity</text>
+  <text x="396" y="447" fill="#8a8a8a" font-size="9.5">ephemeral-system.md</text>
+  <text x="396" y="462" fill="#8a8a8a" font-size="9.5">AGENTS.md &#8212; engagement rules</text>
+  <text x="396" y="482" fill="#6a6a6a" font-size="9">system prompt of the OODA loop</text>
+
+  <rect x="586" y="394" width="190" height="100" rx="4" fill="#141414" stroke="#4a4a4a"/>
+  <text x="600" y="414" fill="#e8e8e8" font-size="11" font-weight="700">skills (SKILL.md)</text>
+  <text x="600" y="432" fill="#8a8a8a" font-size="9.5">pentest-ooda &#183; attack-navigation</text>
+  <text x="600" y="447" fill="#8a8a8a" font-size="9.5">l3-recon-pivot &#183; web-pentest</text>
+  <text x="600" y="462" fill="#8a8a8a" font-size="9.5">aws-pacu-privesc</text>
+  <text x="600" y="477" fill="#8a8a8a" font-size="9.5">pentest-report &#183; ooda-report-handoff</text>
+
+  <!-- MCP client -->
+  <rect x="366" y="522" width="426" height="58" rx="4" fill="#101010" stroke="#9a9a9a" stroke-width="1.2"/>
+  <text x="382" y="544" fill="#e8e8e8" font-size="12" font-weight="700">[&#8734;] MCP CLIENT &#183; zero native toolsets</text>
+  <text x="382" y="562" fill="#8a8a8a" font-size="9.5">Hermes' entire tool surface = the two MCP servers on the right (kali + playwright)</text>
+  <text x="382" y="575" fill="#6a6a6a" font-size="9">principle: everything goes through MCP</text>
+
+  <!-- reasoning model note -->
+  <rect x="366" y="594" width="426" height="56" rx="4" fill="#0e0e0e" stroke="#8a4a4a" stroke-width="1.1"/>
+  <text x="382" y="615" fill="#e8a0a0" font-size="11" font-weight="700">reasoning model &#8594; mistralai/mistral-large (via OpenRouter)</text>
+  <text x="382" y="632" fill="#9a7a7a" font-size="9.5">chosen on purpose: accepts the authorized-offensive framing</text>
+  <text x="382" y="645" fill="#8a6a6a" font-size="9">stateless completions &#183; N parallel calls per OODA cycle</text>
+
+  <!-- ==== KALI MCP ==== -->
+  <rect x="836" y="200" width="582" height="286" rx="6" fill="#0b0b0b" stroke="#9a9a9a" stroke-width="1.6"/>
+  <g transform="translate(862,228)">
+    <path d="M-13,11 L0,-14 L13,11 z" fill="none" stroke="#e8e8e8" stroke-width="1.6"/>
+  </g>
+  <text x="888" y="226" fill="#f2f2f2" font-size="17" font-weight="700" letter-spacing="1"
+        font-family="'Impact','Arial Black',sans-serif">KALI</text>
+  <text x="888" y="245" fill="#8a8a8a" font-size="11">deterministic pentest-tool runtime &#183; kali-mcp server &#183; built from docker/kali</text>
+
+  <rect x="858" y="262" width="536" height="60" rx="4" fill="#101010" stroke="#9a9a9a" stroke-width="1.3"/>
+  <text x="874" y="285" fill="#e8e8e8" font-size="12.5" font-weight="700">[&#8734;] kali-mcp (streamable-HTTP) &#183; :8900</text>
+  <text x="874" y="304" fill="#8a8a8a" font-size="9.5">tools: kali_run (blocking) &#183; aws_iam_enum &#183; aws_iam_simulate &#183; prowler_scan &#183; record_finding &#183; get_findings</text>
+  <text x="874" y="317" fill="#6a6a6a" font-size="9">one tool call at a time &#183; verbatim returncode + output as evidence</text>
+
+  <rect x="858" y="334" width="256" height="64" rx="4" fill="#141414" stroke="#4a4a4a"/>
+  <text x="874" y="356" fill="#e8e8e8" font-size="11" font-weight="700">CLI tooling (kali_run)</text>
+  <text x="874" y="374" fill="#8a8a8a" font-size="9.5">nmap &#183; whatweb &#183; nuclei &#183; ffuf</text>
+  <text x="874" y="389" fill="#8a8a8a" font-size="9.5">sqlmap &#183; Pacu &#183; aws cli</text>
+
+  <rect x="1138" y="334" width="256" height="64" rx="4" fill="#141414" stroke="#4a4a4a"/>
+  <text x="1154" y="356" fill="#e8e8e8" font-size="11" font-weight="700">artifacts + findings store</text>
+  <text x="1154" y="374" fill="#8a8a8a" font-size="9.5">/artifacts &#183; findings.jsonl</text>
+  <text x="1154" y="389" fill="#8a8a8a" font-size="9.5">data-plane HTTP &#183; :8901</text>
+
+  <rect x="858" y="410" width="536" height="60" rx="4" fill="#0e0e0e" stroke="#6a6a6a" stroke-width="1.1"/>
+  <text x="874" y="432" fill="#cfcfcf" font-size="11" font-weight="700">cloud read-only collectors (optional)</text>
+  <text x="874" y="450" fill="#8a8a8a" font-size="9.5">Prowler &#183; ScoutSuite &#183; Cloudsplaining &#8212; run inside kali</text>
+  <text x="874" y="463" fill="#6a6a6a" font-size="9">AWS creds per stack (AWS_ACCESS_KEY_ID / SECRET / SESSION_TOKEN); empty = disabled</text>
+
+  <!-- ==== PLAYWRIGHT MCP ==== -->
+  <rect x="836" y="502" width="582" height="150" rx="6" fill="#0b0b0b" stroke="#9a9a9a" stroke-width="1.6"/>
+  <text x="862" y="530" fill="#f2f2f2" font-size="15" font-weight="700" letter-spacing="1"
+        font-family="'Impact','Arial Black',sans-serif">PLAYWRIGHT-MCP</text>
+  <text x="862" y="548" fill="#8a8a8a" font-size="11">real browser &#183; headless Chromium &#183; image: mcr.microsoft.com/playwright/mcp</text>
+
+  <rect x="858" y="562" width="536" height="76" rx="4" fill="#101010" stroke="#9a9a9a" stroke-width="1.3"/>
+  <text x="874" y="585" fill="#e8e8e8" font-size="12.5" font-weight="700">[&#8734;] browser MCP &#183; :8931/mcp (internal only)</text>
+  <text x="874" y="604" fill="#8a8a8a" font-size="9.5">tools: navigate &#183; click &#183; type &#183; snapshot &#183; evaluate (web surface for web-pentest skill)</text>
+  <text x="874" y="619" fill="#6a6a6a" font-size="9">--isolated ephemeral profile &#183; --no-sandbox &#183; allowed-host: playwright-mcp:8931</text>
+  <text x="874" y="633" fill="#6a6a6a" font-size="9">not published to host &#8212; reachable only over the docker internal network</text>
+
+  <!-- ===================== OPENROUTER (external cloud) ===================== -->
+  <rect x="344" y="700" width="330" height="92" rx="6" fill="#0a0a0a" stroke="#8a4a4a" stroke-width="1.5"/>
+  <text x="368" y="726" fill="#e8a0a0" font-size="14" font-weight="700" letter-spacing="1">&#9729; OPENROUTER (remote LLM)</text>
+  <text x="368" y="746" fill="#9a7a7a" font-size="10.5">serves mistralai/mistral-large to Hermes</text>
+  <text x="368" y="763" fill="#8a6a6a" font-size="9.5">key: OPENROUTER_API_KEY (required, fail-closed)</text>
+  <text x="368" y="779" fill="#6a6a6a" font-size="9">the ONLY call that leaves the host (outbound HTTPS)</text>
+
+  <!-- ===================== OODA + ATTACK PANEL ===================== -->
+  <rect x="700" y="784" width="740" height="168" rx="6" fill="#080808" stroke="#6a6a6a" stroke-width="1.4"/>
+  <text x="724" y="810" fill="#cfcfcf" font-size="13.5" font-weight="700" letter-spacing="1">THE OODA LOOP &#183; ATT&amp;CK AS THE ORIENT LANGUAGE</text>
+
+  <!-- OODA nodes -->
+  <g transform="translate(772,878)">
+    <circle r="34" fill="#0d0d0d" stroke="#e8e8e8" stroke-width="1.6"/>
+    <text x="0" y="-4" font-size="13" font-weight="700" fill="#f2f2f2" text-anchor="middle">OBSERVE</text>
+    <text x="0" y="12" font-size="8.5" fill="#8a8a8a" text-anchor="middle">server_info</text>
+  </g>
+  <g transform="translate(930,878)">
+    <circle r="34" fill="#0d0d0d" stroke="#e8e8e8" stroke-width="1.6"/>
+    <text x="0" y="-4" font-size="13" font-weight="700" fill="#f2f2f2" text-anchor="middle">ORIENT</text>
+    <text x="0" y="12" font-size="8.5" fill="#b03a3a" text-anchor="middle">+ ATT&amp;CK</text>
+  </g>
+  <g transform="translate(1088,878)">
+    <circle r="34" fill="#0d0d0d" stroke="#e8e8e8" stroke-width="1.6"/>
+    <text x="0" y="-4" font-size="13" font-weight="700" fill="#f2f2f2" text-anchor="middle">DECIDE</text>
+    <text x="0" y="12" font-size="8.5" fill="#8a8a8a" text-anchor="middle">alternatives</text>
+  </g>
+  <g transform="translate(1246,878)">
+    <circle r="34" fill="#0d0d0d" stroke="#e8e8e8" stroke-width="1.6"/>
+    <text x="0" y="-4" font-size="13" font-weight="700" fill="#f2f2f2" text-anchor="middle">ACT</text>
+    <text x="0" y="12" font-size="8.5" fill="#8a8a8a" text-anchor="middle">kali_run</text>
+  </g>
+
+  <path d="M806,878 L892,878" fill="none" stroke="#cfcfcf" stroke-width="2" marker-end="url(#aLoop)"/>
+  <path d="M964,878 L1050,878" fill="none" stroke="#cfcfcf" stroke-width="2" marker-end="url(#aLoop)"/>
+  <path d="M1122,878 L1208,878" fill="none" stroke="#cfcfcf" stroke-width="2" marker-end="url(#aLoop)"/>
+  <path d="M1246,912 C1246,944 772,944 772,912" fill="none" stroke="#cfcfcf" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#aLoop)"/>
+  <text x="1009" y="940" fill="#8a8a8a" font-size="9.5" text-anchor="middle">record evidence (technique_id) &#183; 3 cycles without progress &#8594; report handoff</text>
+  <text x="930" y="832" fill="#b03a3a" font-size="9" text-anchor="middle">"which tactic comes next?"</text>
+  <path d="M930,836 L930,842" fill="none" stroke="#b03a3a" stroke-width="1.3" marker-end="url(#aLoop)"/>
+
+  <!-- ===================== FLOWS ===================== -->
+  <!-- assistant -> API (request) -->
+  <path d="M262,330 C300,330 300,312 366,312" fill="none" stroke="#e8e8e8" stroke-width="2.4" marker-end="url(#aReq)"/>
+  <text x="314" y="304" fill="#e8e8e8" font-size="9.5" text-anchor="middle" font-weight="700">HTTP + Bearer</text>
+  <text x="314" y="316" fill="#8a8a8a" font-size="8.5" text-anchor="middle">POST /v1/runs</text>
+  <!-- API -> assistant (events) -->
+  <path d="M366,336 C300,336 300,360 262,360" fill="none" stroke="#7f8c8d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#aEvt)"/>
+  <text x="312" y="378" fill="#7f8c8d" font-size="9" text-anchor="middle">SSE events / status &#8617;</text>
+
+  <!-- MCP client -> kali -->
+  <path d="M792,540 C816,540 816,292 858,292" fill="none" stroke="#e8e8e8" stroke-width="2.4" marker-end="url(#aReq)"/>
+  <text x="820" y="400" fill="#cfcfcf" font-size="9.5" text-anchor="middle" transform="rotate(-90 820 400)">MCP &#183; kali:8900</text>
+  <!-- MCP client -> playwright -->
+  <path d="M792,556 C816,556 816,600 858,600" fill="none" stroke="#e8e8e8" stroke-width="2.4" marker-end="url(#aReq)"/>
+  <text x="824" y="582" fill="#cfcfcf" font-size="9.5" text-anchor="middle">MCP &#183; :8931</text>
+
+  <!-- Hermes -> OpenRouter -->
+  <path d="M500,650 C500,676 500,686 500,700" fill="none" stroke="#b03a3a" stroke-width="2.2" marker-end="url(#aLlm)"/>
+  <text x="516" y="684" fill="#b03a3a" font-size="9.5" text-anchor="start">LLM reasoning (HTTPS)</text>
+
+  <!-- kali -> target -->
+  <path d="M1418,292 C1440,292 1440,292 1462,292" fill="none" stroke="#b03a3a" stroke-width="2.4" marker-end="url(#aTgt)"/>
+  <text x="1360" y="276" fill="#b03a3a" font-size="10.5" text-anchor="start" font-weight="700">&#8594; AUTHORIZED TARGET</text>
+  <text x="1360" y="312" fill="#8a6a6a" font-size="8.5" text-anchor="start">no scope-gate &#8212; operator owns it</text>
+
+  <!-- ===================== LEGEND ===================== -->
+  <rect x="36" y="460" width="250" height="294" rx="6" fill="#0a0a0a" stroke="#4a4a4a" stroke-width="1.2"/>
+  <text x="54" y="486" fill="#f2f2f2" font-size="12.5" font-weight="700" letter-spacing="1">&#8224; LEGEND</text>
+
+  <line x1="54" y1="510" x2="90" y2="510" stroke="#e8e8e8" stroke-width="2.4" marker-end="url(#aReq)"/>
+  <text x="100" y="514" fill="#cfcfcf" font-size="10.5">request / call</text>
+
+  <line x1="54" y1="534" x2="90" y2="534" stroke="#7f8c8d" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#aEvt)"/>
+  <text x="100" y="538" fill="#cfcfcf" font-size="10.5">events / response</text>
+
+  <line x1="54" y1="558" x2="90" y2="558" stroke="#b03a3a" stroke-width="2.2" marker-end="url(#aLlm)"/>
+  <text x="100" y="562" fill="#cfcfcf" font-size="10.5">LLM / target (outbound)</text>
+
+  <line x1="54" y1="586" x2="286" y2="586" stroke="#2f2f2f"/>
+  <text x="54" y="608" fill="#f2f2f2" font-size="12" font-weight="700">HOST PORTS</text>
+  <text x="54" y="628" fill="#cfcfcf" font-size="9.5">:8642  Hermes API (Bearer)</text>
+  <text x="54" y="644" fill="#cfcfcf" font-size="9.5">:8900  kali-mcp</text>
+  <text x="54" y="660" fill="#cfcfcf" font-size="9.5">:8901  artifacts data-plane</text>
+  <text x="54" y="676" fill="#7f8c8d" font-size="9.5">:8931  playwright (internal only)</text>
+
+  <line x1="54" y1="690" x2="286" y2="690" stroke="#2f2f2f"/>
+  <text x="54" y="710" fill="#8a8a8a" font-size="9">assistant triggers &#183; Hermes reasons the OODA</text>
+  <text x="54" y="724" fill="#8a8a8a" font-size="9">kali executes &#183; findings are evidence-first</text>
+  <text x="54" y="740" fill="#5a5a5a" font-size="8.5">&#8224; summoned from the depths of the OODA abyss &#8224;</text>
+</svg>
