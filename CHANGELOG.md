@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 2026-10-16
 
+### Changed
+- **`pentest-report` now emits the report in English.** `docker/kali/report_gen.py` previously
+  rendered the Markdown deliverable in Spanish; its output strings (section headings, status
+  labels, executive summary, methodology, evidence labels, and the `main` summary line) are now
+  English, aligned with the repo's public documentation. Logic is unchanged and the module's
+  own code comments/docstrings stay in Spanish like the rest of `docker/kali/`. The unit tests
+  in `docker/kali/tests/test_report_gen.py` were updated to assert the English output.
+- Added a redacted English sample deliverable (`docs/example-report.md`) and its matching
+  findings store (`docs/example-findings.jsonl`), linked from the README, showing the
+  end-to-end OODA-over-MCP output (recon → recorded findings with ATT&CK `technique_id` and
+  verbatim evidence → generated report). Target IP uses the RFC 5737 documentation address;
+  device serial and hostname are redacted.
+
 ### Added
 - **`vulnerator-mcp` MCP front door over the Hermes `:8642` runs API (up by default).** A thin
   FastMCP wrapper (`docker/mcp/`) that lets external MCP clients (Claude Code / Kiro locally

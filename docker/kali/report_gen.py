@@ -17,6 +17,10 @@ executive summary (no técnico), tabla de severidades, metodología (OODA/PTES/O
 findings con CVSS 3.1 + CWE y evidencia reproducible, remediación. CVSS/severidad solo para
 hallazgos CONFIRMADOS (coherente con "no hay hallazgo sin evidencia").
 
+IDIOMA DE SALIDA: el informe se emite en INGLÉS (alineado con la documentación pública del
+repo). Los comentarios/docstrings de este módulo permanecen en español, como el resto de
+docker/kali/. Solo las cadenas que acaban en el Markdown entregable están en inglés.
+
 Dato NO confiable: la evidencia de cada hallazgo (comando/salida) viene de tools contra un
 target real. Aquí se RENDERIZA verbatim dentro de bloques de código; nunca se interpreta.
 """
@@ -33,12 +37,12 @@ import finding_store
 # Nombre canónico del informe dentro del directorio del engagement (artefacto descargable).
 REPORT_NAME = "pentest-report.md"
 
-# Orden de presentación de los estados y su etiqueta humana.
+# Orden de presentación de los estados y su etiqueta humana (salida en inglés).
 _STATE_LABEL = {
-    "confirmed": "Confirmado",
-    "partial": "Parcial",
-    "hypothesis": "Hipótesis",
-    "discarded": "Descartado",
+    "confirmed": "Confirmed",
+    "partial": "Partial",
+    "hypothesis": "Hypothesis",
+    "discarded": "Discarded",
 }
 _STATE_ORDER = ["confirmed", "partial", "hypothesis", "discarded"]
 
@@ -59,23 +63,23 @@ def _fence(text: str) -> str:
 def _evidence_block(evidence: dict) -> list[str]:
     """Renderiza la evidencia de un hallazgo (comando/returncode/salida o ref a artefacto)."""
     if not isinstance(evidence, dict) or not evidence:
-        return ["_Sin evidencia registrada._"]
+        return ["_No evidence recorded._"]
     out: list[str] = []
     command = evidence.get("command")
     if command:
-        out.append("**Comando:**")
+        out.append("**Command:**")
         out.append(_fence(str(command)))
     if "returncode" in evidence:
         out.append(f"**Return code:** `{evidence.get('returncode')}`")
     output = evidence.get("output")
     if output:
-        out.append("**Salida (verbatim, dato no confiable):**")
+        out.append("**Output (verbatim, untrusted data):**")
         out.append(_fence(str(output)))
     ref = evidence.get("artifact_ref")
     if isinstance(ref, dict) and ref:
         exec_id = ref.get("execution_id", "")
         name = ref.get("name", "")
-        out.append(f"**Artefacto:** `{exec_id}/{name}` (descargable por el canal de datos).")
+        out.append(f"**Artifact:** `{exec_id}/{name}` (downloadable via the data channel).")
     if not out:
         # Evidencia con forma desconocida: se vuelca verbatim para no perder información.
         out.append(_fence(repr(evidence)))
@@ -84,37 +88,37 @@ def _evidence_block(evidence: dict) -> list[str]:
 
 def _finding_section(index: int, finding: dict) -> list[str]:
     """Renderiza un hallazgo individual como sección Markdown."""
-    title = finding.get("title", "(sin título)")
+    title = finding.get("title", "(untitled)")
     state = finding.get("state", "")
     lines = [f"### F{index}. {title}", ""]
 
     meta_rows = [
-        ("Estado", _STATE_LABEL.get(state, state or "—")),
-        ("Fase OODA", finding.get("phase") or "—"),
-        ("Técnica ATT&CK", finding.get("technique_id") or "—"),
+        ("Status", _STATE_LABEL.get(state, state or "—")),
+        ("OODA phase", finding.get("phase") or "—"),
+        ("ATT&CK technique", finding.get("technique_id") or "—"),
         ("Target", finding.get("target") or "—"),
-        ("Confianza", finding.get("confidence") or "—"),
+        ("Confidence", finding.get("confidence") or "—"),
     ]
     # CVSS/CWE solo tienen sentido en hallazgos confirmados (disciplina "no hay hallazgo
     # sin evidencia"): se muestran si el agente los registró.
     if state == "confirmed":
-        meta_rows.append(("CVSS 3.1", finding.get("cvss") or "— (pendiente de puntuar)"))
+        meta_rows.append(("CVSS 3.1", finding.get("cvss") or "— (not scored)"))
         meta_rows.append(("CWE", finding.get("cwe") or "—"))
 
-    lines.append("| Campo | Valor |")
+    lines.append("| Field | Value |")
     lines.append("|---|---|")
     for key, value in meta_rows:
         lines.append(f"| {key} | {value} |")
     lines.append("")
 
-    lines.append("**Evidencia:**")
+    lines.append("**Evidence:**")
     lines.append("")
     lines.extend(_evidence_block(finding.get("evidence", {})))
     lines.append("")
 
     remediation = finding.get("remediation")
     if remediation:
-        lines.append("**Remediación:**")
+        lines.append("**Remediation:**")
         lines.append("")
         lines.append(str(remediation))
         lines.append("")
@@ -123,12 +127,12 @@ def _finding_section(index: int, finding: dict) -> list[str]:
     if isinstance(change, dict) and change:
         tag = change.get("tag", "")
         revert = change.get("revert", "")
-        lines.append("**Cambio introducido en la cuenta/target (trazabilidad):**")
+        lines.append("**Change introduced in the account/target (traceability):**")
         lines.append("")
         if tag:
             lines.append(f"- Tag: `{tag}`")
         if revert:
-            lines.append("- Reversión:")
+            lines.append("- Revert:")
             lines.append(_fence(str(revert)))
         lines.append("")
 
@@ -155,57 +159,57 @@ def render_markdown(engagement_id: str, findings: list[dict], generated_at: str 
             extra.append(f)
 
     lines: list[str] = []
-    lines.append(f"# Informe de pentest — engagement `{engagement_id}`")
+    lines.append(f"# Pentest report — engagement `{engagement_id}`")
     lines.append("")
-    lines.append(f"- **Generado:** {generated_at}")
-    lines.append(f"- **Total de hallazgos registrados:** {len(findings)}")
+    lines.append(f"- **Generated:** {generated_at}")
+    lines.append(f"- **Total recorded findings:** {len(findings)}")
     lines.append("")
 
     # --- Resumen ejecutivo (no técnico) ---
     confirmed = by_state["confirmed"]
-    lines.append("## Resumen ejecutivo")
+    lines.append("## Executive summary")
     lines.append("")
     if confirmed:
         lines.append(
-            f"Durante el engagement se confirmaron **{len(confirmed)}** hallazgo(s) con "
-            "evidencia reproducible. El detalle técnico, la evidencia y la remediación de "
-            "cada uno figuran más abajo. Los elementos marcados como hipótesis o parciales "
-            "requieren verificación adicional y no constituyen explotación confirmada."
+            f"The engagement confirmed **{len(confirmed)}** finding(s) with reproducible "
+            "evidence. The technical detail, evidence and remediation for each are below. "
+            "Items marked as hypothesis or partial require further verification and do not "
+            "constitute confirmed exploitation."
         )
     else:
         lines.append(
-            "No se confirmó ningún hallazgo explotable con evidencia reproducible en el "
-            "alcance y la ventana de este engagement. Esto NO equivale a un veredicto de "
-            "\"sistema seguro\": es la ausencia de hallazgos confirmados con los métodos y el "
-            "tiempo empleados. Los elementos registrados como hipótesis o parciales quedan "
-            "documentados para seguimiento."
+            "No exploitable finding was confirmed with reproducible evidence within the "
+            "scope and window of this engagement. This is NOT a verdict of a \"secure "
+            "system\": it is the absence of confirmed findings given the methods and time "
+            "used. Items recorded as hypothesis or partial are documented for follow-up."
         )
     lines.append("")
 
     # --- Tabla de severidades (por estado) ---
-    lines.append("## Resumen por estado")
+    lines.append("## Summary by status")
     lines.append("")
-    lines.append("| Estado | Nº |")
+    lines.append("| Status | Count |")
     lines.append("|---|---|")
     for state in _STATE_ORDER:
         lines.append(f"| {_STATE_LABEL[state]} | {len(by_state[state])} |")
     if extra:
-        lines.append(f"| Otros | {len(extra)} |")
+        lines.append(f"| Other | {len(extra)} |")
     lines.append("")
 
     # --- Metodología ---
-    lines.append("## Metodología")
+    lines.append("## Methodology")
     lines.append("")
     lines.append(
-        "El engagement se condujo con un bucle **OODA** (Observe-Orient-Decide-Act), "
-        "orientando por tácticas y técnicas **MITRE ATT&CK** y apoyándose en las prácticas "
-        "de **PTES** y **OWASP** según la superficie (red, cloud, web). Cada hallazgo exige "
-        "evidencia reproducible del comando ejecutado; no hay hallazgo confirmado sin prueba."
+        "The engagement was driven by an **OODA** loop (Observe-Orient-Decide-Act), "
+        "orienting by **MITRE ATT&CK** tactics and techniques and drawing on **PTES** and "
+        "**OWASP** practices according to the surface (network, cloud, web). Each finding "
+        "requires reproducible evidence of the executed command; there is no confirmed "
+        "finding without proof."
     )
     lines.append("")
 
     # --- Hallazgos (confirmados primero) ---
-    lines.append("## Hallazgos")
+    lines.append("## Findings")
     lines.append("")
     counter = 1
     any_rendered = False
@@ -224,17 +228,16 @@ def render_markdown(engagement_id: str, findings: list[dict], generated_at: str 
         lines.extend(_finding_section(counter, f))
         counter += 1
     if not any_rendered:
-        lines.append("_No hay hallazgos registrados para este engagement._")
+        lines.append("_No findings recorded for this engagement._")
         lines.append("")
 
     # --- Nota de alcance / limitaciones ---
-    lines.append("## Alcance y limitaciones")
+    lines.append("## Scope and limitations")
     lines.append("")
     lines.append(
-        "Este informe refleja únicamente los hallazgos registrados durante el engagement "
-        "contra targets autorizados por el operador. La responsabilidad del alcance recae "
-        "en el operador. La evidencia incluida es dato crudo de las herramientas y se "
-        "presenta verbatim."
+        "This report reflects only the findings recorded during the engagement against "
+        "operator-authorized targets. Responsibility for the scope rests with the operator. "
+        "The included evidence is raw tool output, presented verbatim."
     )
     lines.append("")
 
@@ -262,9 +265,9 @@ def generate(engagement_id: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Genera el informe Markdown de pentest desde el store de hallazgos."
+        description="Generate the Markdown pentest report from the findings store."
     )
-    parser.add_argument("--engagement", required=True, help="engagement_id del store de hallazgos")
+    parser.add_argument("--engagement", required=True, help="engagement_id in the findings store")
     args = parser.parse_args(argv)
     try:
         result = generate(args.engagement)
@@ -274,8 +277,8 @@ def main(argv: list[str] | None = None) -> int:
     entry = result["artifact"]
     # Línea de salida legible para el bucle OODA (la ve por kali_run).
     print(
-        f"informe generado: {args.engagement}/{entry['name']} "
-        f"({entry['size']} bytes, {result['findings_count']} hallazgos, "
+        f"report generated: {args.engagement}/{entry['name']} "
+        f"({entry['size']} bytes, {result['findings_count']} findings, "
         f"sha256={entry['sha256']})"
     )
     return 0

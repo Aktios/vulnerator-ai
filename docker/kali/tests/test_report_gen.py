@@ -34,18 +34,18 @@ def staging(tmp_path, monkeypatch):
 
 def test_render_has_core_sections():
     md = report_gen.render_markdown("eng-x", [], generated_at="2026-01-01T00:00:00Z")
-    assert "# Informe de pentest" in md
-    assert "## Resumen ejecutivo" in md
-    assert "## Resumen por estado" in md
-    assert "## Metodología" in md
-    assert "## Hallazgos" in md
-    assert "## Alcance y limitaciones" in md
+    assert "# Pentest report" in md
+    assert "## Executive summary" in md
+    assert "## Summary by status" in md
+    assert "## Methodology" in md
+    assert "## Findings" in md
+    assert "## Scope and limitations" in md
 
 
 def test_render_empty_does_not_claim_secure():
     md = report_gen.render_markdown("eng-x", [])
-    assert "No se confirmó ningún hallazgo" in md
-    assert "sistema seguro" in md  # aparece precisamente para NEGAR ese veredicto
+    assert "No exploitable finding was confirmed" in md
+    assert "secure" in md  # aparece precisamente para NEGAR ese veredicto ("secure system")
 
 
 def test_render_groups_and_counts_by_state():
@@ -57,12 +57,12 @@ def test_render_groups_and_counts_by_state():
         {"title": "e", "state": "discarded"},
     ]
     md = report_gen.render_markdown("eng-x", findings)
-    assert "| Confirmado | 2 |" in md
-    assert "| Parcial | 1 |" in md
-    assert "| Hipótesis | 1 |" in md
-    assert "| Descartado | 1 |" in md
+    assert "| Confirmed | 2 |" in md
+    assert "| Partial | 1 |" in md
+    assert "| Hypothesis | 1 |" in md
+    assert "| Discarded | 1 |" in md
     # Confirmados se renderizan antes que hipótesis.
-    assert md.index("Confirmado (2)") < md.index("Hipótesis (1)")
+    assert md.index("Confirmed (2)") < md.index("Hypothesis (1)")
 
 
 def test_render_cvss_only_for_confirmed():
@@ -136,5 +136,5 @@ def test_main_prints_line_and_returns_zero(staging, capsys):
     rc = report_gen.main(["--engagement", "eng-main"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "informe generado: eng-main/pentest-report.md" in out
-    assert "1 hallazgos" in out
+    assert "report generated: eng-main/pentest-report.md" in out
+    assert "1 findings" in out
