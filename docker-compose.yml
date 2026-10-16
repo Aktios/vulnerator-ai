@@ -89,6 +89,12 @@ services:
         cp -r /opt/profile-src/skills/. "$$DEF/skills/" 2>/dev/null || true
         # (b) inject the API server KEY (secret, not versioned) BEFORE starting.
         hermes config set platforms.api_server.key "$$HERMES_API_SERVER_KEY" >/dev/null
+        # (b2) OPTIONAL model override: if OPENROUTER_MODEL is set and non-empty, override
+        # model.default at runtime. If empty/unset, do nothing so the profile's model.default
+        # (mistralai/mistral-large-4-0) is used as-is (fallback).
+        if [ -n "$$OPENROUTER_MODEL" ]; then
+          hermes config set model.default "$$OPENROUTER_MODEL" >/dev/null
+        fi
         # (c) start the default profile gateway: foreground (live container) + API server.
         exec hermes gateway run
     environment:
@@ -101,6 +107,10 @@ services:
       # (OPENROUTER_API_KEY), which is why HERMES_LLM_API_KEY is NOT declared. Required
       # fail-closed: without it the agent cannot reason.
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:?Falta OPENROUTER_API_KEY - define la API key de OpenRouter en .env}"
+      # OPTIONAL OpenRouter model override (NOT fail-closed): empty default. When set and
+      # non-empty, the startup command runs 'hermes config set model.default' to override the
+      # profile's model.default; when empty/unset, the profile default is used (fallback).
+      OPENROUTER_MODEL: "${OPENROUTER_MODEL:-}"
     volumes:
       # NAMED VOLUME REQUIRED (never a bind-mount): Hermes' state.db SQLite in WAL mode
       # GETS CORRUPTED on bind-mounts that cross the macOS VM (virtiofs).

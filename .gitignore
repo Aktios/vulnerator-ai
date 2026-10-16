@@ -38,3 +38,10 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+
+# --- Notas de trabajo locales (no versionar) ---
+# Backlog interno de features y planificación; vive en el repo pero fuera de git.
+backlog.md
+# Artefactos internos de agentes/workflows (informes, notas de verificación): no son producto.
+.agents/
+.worktrees/

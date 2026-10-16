@@ -59,6 +59,7 @@ variables empty in the `.env`:
 | `AWS_SECRET_ACCESS_KEY` | No | Secret for that same credential. In the `.env`. |
 | `AWS_SESSION_TOKEN` | No | Only for temporary credentials (STS). In the `.env`. |
 | `AWS_REGION` | No | Default region (e.g. `us-east-1`). In the `.env`. |
+| `OPENROUTER_MODEL` | No | Overrides the OpenRouter model Hermes reasons with. Empty = the profile default (`mistralai/mistral-large-4-0`). **Caveat:** the project uses Mistral Large on purpose because models like Claude (`anthropic/*`) refuse the authorized-offensive pentest framing (OpenRouter/Anthropic returns "violative cyber content"); overriding with such a model may make the agent refuse to work. |
 
 The rest of the `.env.example` variables (host ports, artifacts token, Prowler
 scoping) are optional and come with defaults; leave them empty unless you need to

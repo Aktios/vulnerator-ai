@@ -23,6 +23,10 @@ model:
   # (anthropic/claude-sonnet-*) rechaza el encuadre ofensivo (el safety filter de OpenRouter/
   # Anthropic devuelve "violative cyber content" y no responde). Mistral large no rehusa el pentest
   # autorizado, por eso es el modelo del conductor OODA.
+  # NOTA: este valor es el DEFAULT de fallback. Se puede sobreescribir en tiempo de arranque con la
+  # variable de entorno OPENROUTER_MODEL (ver docker-compose.yml / .env.example): si OPENROUTER_MODEL
+  # esta definida y no vacia, el arranque hace `hermes config set model.default <valor>`; si esta
+  # vacia o sin definir, se usa este valor tal cual.
   default: "mistralai/mistral-large-4-0"
 
 # --- Primer servidor MCP: la Kali (contenedor `kali`) -----------------------
