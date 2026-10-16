@@ -16,11 +16,18 @@
 mcp>=1.28,<2
 
 # httpx: cliente HTTP del hop a :8642. Justificado (no es stdlib pura por un motivo
-#   concreto): GET /v1/runs/{id}/events es un stream SSE de larga vida que httpx.stream(...)
-#   consume limpiamente línea a línea; urllib de la stdlib no streamea SSE de forma
-#   cómoda. Todo lo demás del cliente es request/response plano pero se mantiene sobre el
-#   mismo cliente para una única ruta de auth/transporte.
-httpx
+#   concreto): GET /v1/runs/{id}/events es un stream SSE de larga vida que
+#   httpx.AsyncClient.stream(...) consume limpiamente línea a línea bajo un deadline
+#   async; urllib de la stdlib no streamea SSE de forma cómoda. Todo lo demás del cliente
+#   es request/response plano pero se mantiene sobre el mismo cliente para una única ruta
+#   de auth/transporte.
+#
+#   Se acota con un límite inferior (disciplina de pin del repo, igual que prowler==5.44.0
+#   en Kali): >=0.27 por la API async usada (AsyncClient.stream + Timeout(read=None)) y <1
+#   para no saltar a una major con cambios de API. El contenedor Kali vivo y la verificación
+#   corren httpx 0.28.1 (dentro del rango). El SDK `mcp` ya depende de httpx; aquí se declara
+#   explícito porque este módulo lo importa y lo usa directamente.
+httpx>=0.27,<1
 
 # anyio: dependencia del transporte asíncrono del SDK mcp (streamable-HTTP), igual que en
 #   la imagen Kali. Se fija >=4 por el mismo motivo (API async de esa era).
@@ -31,4 +38,8 @@ anyio>=4
 #   `mcp.run(transport="streamable-http")` directamente porque necesitamos interponer el
 #   middleware). Es dependencia transitiva del SDK mcp (streamable-HTTP), pero se declara
 #   explícita porque este servidor la importa y la invoca directamente (fail-closed si falta).
-uvicorn
+#
+#   Se acota con un límite inferior (disciplina de pin del repo): >=0.30 por `uvicorn.run`
+#   sobre una app ASGI con Starlette moderno y <1 para no saltar a una major. La verificación
+#   corre uvicorn 0.54.0 (dentro del rango).
+uvicorn>=0.30,<1

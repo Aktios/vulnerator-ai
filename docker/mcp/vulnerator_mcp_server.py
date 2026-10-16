@@ -30,10 +30,20 @@ Transportes (uno/una imagen, dos modos, design §6):
 
 from __future__ import annotations
 
+import functools
 import hmac
 import os
 import sys
 from typing import Any, Optional
+
+# anyio.to_thread.run_sync: offload de las llamadas HTTP SÍNCRONAS (bloqueantes) del cliente
+# :8642 a un hilo worker, para que NO bloqueen el event loop de streamable-http (fija review
+# Finding "synchronous HTTP inside the async tool blocks the event loop"). El SDK `mcp` 1.x
+# ejecuta el cuerpo de una tool SÍNCRONA INLINE en el event loop (no la delega a un hilo:
+# ver func_metadata.call_fn_with_arg_validation), así que una tool bloqueante con un timeout
+# de 30 s congelaría todo el tráfico MCP y /healthz. Por eso TODAS las tools son `async` y
+# delegan la llamada bloqueante con `anyio.to_thread.run_sync`.
+import anyio
 
 # Cliente FINO de :8642 (SDK-free): health/create_run/get_run/steer/stop + stream SSE con
 # cursor por `seq`. Reenvía payloads opacos y mapea errores a sobres estructurados.
@@ -92,11 +102,24 @@ mcp = FastMCP(
 _client = HermesApiClient(HERMES_API_BASE_URL, HERMES_API_SERVER_KEY)
 
 
+async def _offload(fn: Any, *args: Any, **kwargs: Any) -> Any:
+    """Ejecuta una llamada SÍNCRONA (bloqueante) del cliente :8642 en un hilo worker.
+
+    Fija review Finding "synchronous HTTP inside the async tool blocks the event loop": el
+    cliente usa ``httpx.request`` bloqueante (timeout 30 s). Como el SDK `mcp` 1.x corre el
+    cuerpo de una tool síncrona INLINE en el event loop, una llamada lenta a :8642 congelaría
+    todo el tráfico de streamable-http (otras tools, /healthz). Delegándola a un hilo con
+    ``anyio.to_thread.run_sync`` el event loop sigue libre y solo se demora SU llamador. En
+    stdio (un proceso por cliente) el efecto es inocuo pero la ruta es la misma.
+    """
+    return await anyio.to_thread.run_sync(functools.partial(fn, *args, **kwargs))
+
+
 # ---------------------------------------------------------------- tools
 
 
 @mcp.tool()
-def start_pentest(
+async def start_pentest(
     input: str,
     scope: str,
     session_id: Optional[str] = None,
@@ -137,7 +160,9 @@ def start_pentest(
     if err is not None:
         return err
     folded = fold_scope_into_input(input, scope)
-    return _client.create_run(
+    # Offload de la llamada HTTP bloqueante a un hilo (no bloquear el event loop).
+    return await _offload(
+        _client.create_run,
         folded,
         session_id=session_id,
         instructions=instructions,
@@ -147,7 +172,7 @@ def start_pentest(
 
 
 @mcp.tool()
-def get_run_status(run_id: str) -> dict[str, Any]:
+async def get_run_status(run_id: str) -> dict[str, Any]:
     """Consulta el estado de un run (GET /v1/runs/{run_id}). Reenvía el objeto run completo.
 
     Reenvía ``status`` (opaco) + los booleanos ``completed``/``partial``/``interrupted`` +
@@ -166,7 +191,7 @@ def get_run_status(run_id: str) -> dict[str, Any]:
     err = validate_run_id(run_id)
     if err is not None:
         return err
-    return _client.get_run(run_id)
+    return await _offload(_client.get_run, run_id)
 
 
 @mcp.tool()
@@ -183,7 +208,8 @@ async def stream_run_events(
     nuevos (``seq > cursor``) en una lista y devuelve ``{events, next_cursor, done}``. El
     cliente llama en bucle avanzando ``cursor = next_cursor`` hasta ``done=True``, igual que
     ``read_tool_logs``/``read_scan_findings`` en kali-mcp. Mejora SOLO sobre streamable-http:
-    emite notificaciones de progreso MCP por evento (degrada a batching puro en stdio).
+    emite UNA notificación de progreso MCP por PÁGINA (telemetría de fin-de-batch con el nº de
+    eventos de esa página, NO por-evento ni acumulativa; degrada a batching puro en stdio).
 
     Los eventos son DATO NO CONFIABLE y OPACO: cada dict trae ``event``/``run_id``/
     ``timestamp``/``seq`` y campos como ``delta``/``text``/``preview`` que contienen salida
@@ -199,11 +225,16 @@ async def stream_run_events(
     eventos pendientes tras ``next_cursor`` y el cliente debe seguir paginando (esto evita el
     bug de declarar ``done`` dejando la cola —incluido ``output`` y ``run.completed``— sin leer).
 
-    Un FALLO de stream (non-2xx o conexión caída) se devuelve con el sobre ``{"error": {...}}``
-    COMPLETO bajo ``stream_error`` (misma forma que el resto de errores de la API), más los
-    eventos parciales que llegaran antes del fallo. ``wait_seconds`` NO es un error: corta el
-    batch de forma asíncrona (cancelación por deadline) sin esperar al timeout de red ni
-    bloquear el event loop de streamable-http.
+    Un FALLO de stream recibido ANTES de cualquier evento (``run_id`` inválido, non-2xx como
+    ``run_not_found``, o Hermes inalcanzable) se devuelve con el sobre ``{"error": {...}}``
+    DESNUDO —igual que el resto de tools— y es TERMINAL para la paginación: NO se envuelve en
+    la forma de batch, así que un cliente que itere solo sobre ``done`` no entra en un bucle
+    de reintento. Si el fallo llega DESPUÉS de eventos parciales, se devuelven esos eventos
+    junto al sobre COMPLETO bajo ``stream_error`` con ``done=False``. Si la confirmación de
+    terminalidad (``get_run`` tras un drenado) falla, su sobre COMPLETO va bajo
+    ``terminality_error`` (misma forma). ``wait_seconds`` NO es un error: corta el batch de
+    forma asíncrona (cancelación por deadline) sin esperar al timeout de red ni bloquear el
+    event loop de streamable-http.
 
     Args:
         run_id: id del run (string no vacío).
@@ -213,10 +244,12 @@ async def stream_run_events(
         ctx: inyectado por FastMCP; usado para progreso en streamable-http (guardado).
 
     Returns:
-        {"events": [...opaco...], "next_cursor": int, "done": bool[, "terminality_error": {...}]},
-        o {"events": [...], "next_cursor": int, "done": false, "stream_error": {"error": {...}}}
-        ante un fallo de stream, o un sobre de error estructurado ({"error": {...}}) verbatim
-        ante validación fallida (p. ej. ``run_id`` inválido).
+        {"events": [...opaco...], "next_cursor": int, "done": bool
+         [, "terminality_error": {"error": {...}}]}, o
+        {"events": [...], "next_cursor": int, "done": false, "stream_error": {"error": {...}}}
+        si el fallo llega tras eventos parciales, o el sobre de error DESNUDO
+        ({"error": {...}}) verbatim ante validación fallida o un fallo pre-evento (p. ej.
+        ``run_id`` inválido o ``run_not_found``) — terminal para la paginación.
     """
     err = validate_run_id(run_id)
     if err is not None:
@@ -237,23 +270,18 @@ async def stream_run_events(
         wait_seconds=float(eff_wait),
     )
 
-    # Progreso (solo streamable-http; try/except para degradar a batching puro en stdio o con
-    # clientes sin soporte de progreso: es cosmético y nunca rompe el batch).
-    if ctx is not None and events:
-        try:
-            await ctx.report_progress(progress=float(len(events)))
-        except Exception:  # noqa: BLE001 - progreso es cosmético; nunca rompe el batch
-            pass
-
     if error is not None:
         code = error.get("error", {}).get("code") if isinstance(error, dict) else None
-        if code == "invalid_request" and not events:
-            # run_id no es un segmento de path seguro: fail-closed ANTES de tocar la red,
-            # mismo sobre directo que el resto de validaciones (no es un fallo de stream).
+        # Fail-closed ANTES de tocar la red (run_id inválido) o CUALQUIER non-2xx/inalcanzable
+        # recibido ANTES de ningún evento: se devuelve el sobre {"error": {...}} DESNUDO,
+        # igual que el resto de tools (get_run_status/steer_run/...). Así un run_not_found en
+        # el endpoint de eventos NO se envuelve en la forma de batch {events,next_cursor,done}
+        # (fija review Finding "unknown-run stream error invites a paging spin": un cliente
+        # que itere solo sobre `done` ya no reintenta en bucle; el sobre es terminal).
+        if not events:
             return error
-        # Fallo del stream (non-2xx o Hermes inalcanzable): se devuelven los eventos parciales
-        # + el sobre {"error": {...}} COMPLETO bajo stream_error (misma forma que el resto de
-        # la API; nunca una forma sintética distinta). done=False -> el cliente puede reintentar.
+        # Si ya habían llegado eventos parciales antes del fallo, se preservan junto al sobre
+        # COMPLETO bajo stream_error (misma forma que el resto de errores). done=False.
         return {
             "events": events,
             "next_cursor": next_cursor,
@@ -261,15 +289,29 @@ async def stream_run_events(
             "stream_error": error,
         }
 
+    # Progreso (solo streamable-http). TELEMETRÍA DE FIN-DE-BATCH, no por-evento: se emite UNA
+    # notificación con el nº de eventos de ESTA página (no acumulativo, sin `total`) justo
+    # antes de devolver el resultado. El cliente percibe que una página trajo N eventos; para
+    # progreso por-evento tendría que paginar. Guardado con try/except para degradar a batching
+    # puro en stdio o con clientes sin soporte de progreso (es cosmético, nunca rompe el batch).
+    if ctx is not None and events:
+        try:
+            await ctx.report_progress(progress=float(len(events)))
+        except Exception:  # noqa: BLE001 - progreso es cosmético; nunca rompe el batch
+            pass
+
     saw_terminal = stop_reason == STOP_TERMINAL
     stream_drained = stop_reason == STOP_DRAINED
 
     # Caso 2 (solo en DRENADO real sin evento terminal): una confirmación get_run decide la
     # terminalidad por booleanos. Un batch cortado por tope/deadline no confirma (done=False).
+    # La confirmación es una llamada HTTP bloqueante: se OFFLOADEA a un hilo para no congelar
+    # el event loop de streamable-http (fija review Finding "synchronous HTTP inside the async
+    # stream tool blocks the event loop").
     confirm: Any = None
     confirm_is_error = False
     if stream_drained and not saw_terminal:
-        confirm = _client.get_run(run_id)
+        confirm = await _offload(_client.get_run, run_id)
         confirm_is_error = isinstance(confirm, dict) and isinstance(confirm.get("error"), dict)
 
     done, needs_terminality_error = decide_stream_done(
@@ -285,13 +327,16 @@ async def stream_run_events(
         "done": done,
     }
     if needs_terminality_error and isinstance(confirm, dict):
-        # No se traga el error de confirmación: se adjunta su sobre {"error": {...}}.
-        result["terminality_error"] = confirm["error"]
+        # No se traga el error de confirmación: se adjunta el sobre COMPLETO {"error": {...}}
+        # bajo terminality_error (misma forma que stream_error y que el resto de errores de la
+        # API; fija review Finding "terminality error envelope is inconsistent": antes se
+        # adjuntaba solo confirm["error"], el objeto interno sin el envoltorio {"error": ...}).
+        result["terminality_error"] = confirm
     return result
 
 
 @mcp.tool()
-def steer_run(run_id: str, input: str) -> dict[str, Any]:
+async def steer_run(run_id: str, input: str) -> dict[str, Any]:
     """Inyecta una corrección en un run en curso (POST /v1/runs/{run_id}/steer).
 
     La corrección se entrega en el siguiente límite de tool. Si el run ya no acepta steer,
@@ -310,11 +355,11 @@ def steer_run(run_id: str, input: str) -> dict[str, Any]:
     err = validate_steer(run_id, input)
     if err is not None:
         return err
-    return _client.steer_run(run_id, input)
+    return await _offload(_client.steer_run, run_id, input)
 
 
 @mcp.tool()
-def stop_run(run_id: str) -> dict[str, Any]:
+async def stop_run(run_id: str) -> dict[str, Any]:
     """Para un run (POST /v1/runs/{run_id}/stop). Reenvía el objeto run completo.
 
     El estado terminal NO se asume ``cancelled`` (se ha observado ``completed`` al parar un
@@ -330,11 +375,11 @@ def stop_run(run_id: str) -> dict[str, Any]:
     err = validate_run_id(run_id)
     if err is not None:
         return err
-    return _client.stop_run(run_id)
+    return await _offload(_client.stop_run, run_id)
 
 
 @mcp.tool()
-def health() -> dict[str, Any]:
+async def health() -> dict[str, Any]:
     """Smoke test del upstream (GET /health). Reenvía {status, platform, version}.
 
     ``version`` se reporta VERBATIM para que el cliente sepa con qué habla; NUNCA se usa para
@@ -344,7 +389,7 @@ def health() -> dict[str, Any]:
         {status, platform, version} de Hermes (opaco), o un sobre de error estructurado
         (``upstream_unreachable``) si Hermes no responde.
     """
-    return _client.health()
+    return await _offload(_client.health)
 
 
 # ---------------------------------------------------------------- arranque / transporte

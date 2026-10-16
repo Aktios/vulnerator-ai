@@ -44,9 +44,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never drops the tail of a multi-page terminal run; the byte budget is checked BEFORE adding
   an event (never overshoots the transport limit by a whole event); the SSE read is async with
   a deadline-aware cancellation so a quiet upstream ends the batch at `wait_seconds` instead of
-  stalling on the network timeout; terminality requires the literal boolean `True`; a stream
-  failure preserves the full `{"error": {...}}` envelope; and the untrusted `run_id` is encoded
-  as a single path segment (route-traversal rejected before any upstream call).
+  stalling on the network timeout — the deadline now also wraps response acquisition and the
+  error-body drain, so an upstream that accepts the connection but withholds headers is bounded
+  by `wait_seconds` too (not just the connect timeout); a single SSE event is bounded by an
+  absolute per-event ceiling (~512 KiB) and, if exceeded, is replaced by a small cursor-safe
+  placeholder (metadata preserved, untrusted payload withheld) so one oversized event can never
+  exceed the transport message limit; terminality requires the literal boolean `True`; a stream
+  failure preserves the full `{"error": {...}}` envelope (surfaced under `stream_error` after
+  partial events, or `terminality_error` for a failed confirming `get_run`), while a failure
+  received BEFORE any event (invalid `run_id`, `run_not_found`, unreachable) returns the bare
+  envelope — terminal for paging, like every other tool; and the untrusted `run_id` is encoded
+  as a single path segment (route-traversal rejected before any upstream call). All six tools
+  are async and offload their blocking `:8642` call to a worker thread, so a slow upstream never
+  freezes the streamable-HTTP event loop (the MCP SDK runs sync tool bodies inline). `httpx` and
+  `uvicorn` carry lower-bound pins in line with the repo's dependency discipline.
 
 ## [1.3.0] - 2026-10-16
 

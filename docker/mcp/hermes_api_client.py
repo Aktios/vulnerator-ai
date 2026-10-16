@@ -51,6 +51,17 @@ DEFAULT_MAX_EVENTS = 200
 # del transporte streamable-http (mismo motivo por el que existe read_scan_findings en
 # Kali). 256 KiB deja margen amplio tras el overhead del sobre MCP.
 DEFAULT_BYTE_BUDGET = 256 * 1024
+# Techo ABSOLUTO del tamaño serializado de UN único evento (fija review Finding "single SSE
+# event has no absolute size limit"). El presupuesto de batch (DEFAULT_BYTE_BUDGET) solo
+# retiene el evento siguiente cuando la página YA no está vacía; un ÚNICO evento sobre una
+# página vacía se admitía por anti-starvation sin tope superior, de modo que un
+# `tool.completed.preview`/`text` no confiable podía exceder el límite ~1 MiB de un mensaje
+# del transporte streamable-http. Este techo acota ese caso: un evento cuyo JSON supere
+# MAX_SINGLE_EVENT_BYTES NO se emite verbatim (truncarlo violaría el pass-through opaco); en
+# su lugar el parser produce un PLACEHOLDER estructurado y cursor-safe (ver _oversized_event)
+# que avanza el cursor para que la paginación no se atasque, informando seq/tipo/tamaño sin
+# el payload. 512 KiB deja margen holgado bajo 1 MiB tras el overhead del sobre MCP.
+MAX_SINGLE_EVENT_BYTES = 512 * 1024
 # Presupuesto wall-clock por batch: una llamada a la tool nunca cuelga al cliente esperando
 # un stream silencioso.
 DEFAULT_WAIT_SECONDS = 25.0
@@ -155,6 +166,15 @@ class SseBatcher:
     incluye (anti-starvation deliberada) y cierra la página tras él, de modo que un batch
     devuelva como mucho UN evento por encima del presupuesto, nunca dos. 256 KiB deja margen
     bajo el 1 MiB del transporte incluso para ese único evento + overhead del sobre MCP.
+
+    Techo ABSOLUTO por evento (fija review Finding "single SSE event has no absolute size
+    limit"): la anti-starvation anterior no acotaba el tamaño de ESE único evento, así que un
+    evento no confiable (p. ej. ``tool.completed.preview``/``text``) podía superar el límite
+    ~1 MiB del transporte. Si el JSON de un evento supera ``max_single_event_bytes``, NO se
+    emite verbatim (truncar un evento opaco violaría el pass-through); se emite en su lugar un
+    PLACEHOLDER estructurado y cursor-safe (``_oversized_event``) que conserva ``event``/
+    ``run_id``/``timestamp``/``seq`` y añade ``vulnerator_mcp_oversized`` con el tamaño y una
+    marca de truncado SIN el payload, avanzando el cursor para no atascar la paginación.
     """
 
     def __init__(
@@ -163,10 +183,12 @@ class SseBatcher:
         after_seq: int = 0,
         max_events: Optional[int] = None,
         byte_budget: int = DEFAULT_BYTE_BUDGET,
+        max_single_event_bytes: int = MAX_SINGLE_EVENT_BYTES,
     ) -> None:
         self._after_seq = after_seq
         self._max = max_events if (max_events is not None and max_events > 0) else None
         self._byte_budget = byte_budget
+        self._max_single = max_single_event_bytes
         self.events: list[dict[str, Any]] = []
         self.next_cursor = after_seq
         self._bytes_seen = 0
@@ -191,6 +213,32 @@ class SseBatcher:
             return None  # ya entregado (dedup entre páginas)
         return event
 
+    @staticmethod
+    def _oversized_event(event: dict[str, Any], size: int, limit: int) -> dict[str, Any]:
+        """Placeholder cursor-safe para un evento que supera el techo absoluto por evento.
+
+        No se trunca el payload opaco (violaría el pass-through); se construye un dict NUEVO
+        que conserva los metadatos de wire (``event``/``run_id``/``timestamp``/``seq``) y marca
+        el truncado bajo ``vulnerator_mcp_oversized`` con el tamaño y el límite, SIN reenviar
+        el contenido no confiable. El ``seq`` se preserva para que el cursor avance y la
+        paginación no se quede atascada en este evento.
+        """
+        placeholder: dict[str, Any] = {
+            "vulnerator_mcp_oversized": {
+                "message": (
+                    "event dropped: serialized size %d bytes exceeds the per-event "
+                    "ceiling of %d bytes (payload withheld to stay under the transport "
+                    "message limit)" % (size, limit)
+                ),
+                "serialized_bytes": size,
+                "limit_bytes": limit,
+            }
+        }
+        for key in ("event", "run_id", "timestamp", "seq"):
+            if key in event:
+                placeholder[key] = event[key]
+        return placeholder
+
     def _emit(self, event: dict[str, Any]) -> Optional[str]:
         """Intenta añadir ``event`` a la página. Devuelve una razón de parada o None.
 
@@ -198,8 +246,27 @@ class SseBatcher:
         presupuesto, NO lo añade y devuelve ``STOP_CAP`` (el evento queda para el próximo
         batch). Un único evento oversized con la página vacía SÍ se añade (anti-starvation),
         y entonces se cierra la página tras él.
+
+        Techo ABSOLUTO (fija review Finding "single SSE event has no absolute size limit"): si
+        el JSON del evento supera ``max_single_event_bytes``, NO se emite verbatim; se emite en
+        su lugar el placeholder cursor-safe de ``_oversized_event`` (que es pequeño y conserva
+        el ``seq``), y se cierra la página con ``STOP_CAP``. Así un único evento no confiable
+        nunca puede exceder el límite del transporte.
         """
         size = len(json.dumps(event))
+        if size > self._max_single:
+            # El evento supera el techo absoluto: nunca se reenvía verbatim. Si la página YA
+            # tiene eventos, se cierra ANTES para no mezclar (el oversized se reprocesa en la
+            # siguiente página con la página vacía).
+            if self.events:
+                return STOP_CAP
+            placeholder = self._oversized_event(event, size, self._max_single)
+            self.events.append(placeholder)
+            seq = placeholder.get("seq")
+            if isinstance(seq, int) and not isinstance(seq, bool) and seq > self.next_cursor:
+                self.next_cursor = seq
+            self._bytes_seen += len(json.dumps(placeholder))
+            return STOP_CAP  # cierra la página tras el placeholder (avanza el cursor)
         if self.events and self._bytes_seen + size > self._byte_budget:
             return STOP_CAP  # cerrar ANTES de cruzar el tope; el evento no se incluye
         self.events.append(event)
@@ -252,6 +319,7 @@ def batch_sse_events(
     after_seq: int = 0,
     max_events: Optional[int] = None,
     byte_budget: int = DEFAULT_BYTE_BUDGET,
+    max_single_event_bytes: int = MAX_SINGLE_EVENT_BYTES,
 ) -> tuple[list[dict[str, Any]], int, str]:
     """Batchea un ITERABLE de líneas en UNA página (helper puro para tests + ruta de error).
 
@@ -260,7 +328,12 @@ def batch_sse_events(
     ``(events, next_cursor, stop_reason)``. El corte por DEADLINE (stream silencioso) lo
     gestiona ``iter_events`` con cancelación async, no este helper síncrono.
     """
-    batcher = SseBatcher(after_seq=after_seq, max_events=max_events, byte_budget=byte_budget)
+    batcher = SseBatcher(
+        after_seq=after_seq,
+        max_events=max_events,
+        byte_budget=byte_budget,
+        max_single_event_bytes=max_single_event_bytes,
+    )
     for raw_line in lines:
         reason = batcher.feed(raw_line)
         if reason is not None:
@@ -449,9 +522,14 @@ class HermesApiClient:
 
         Es ASYNC y con deadline propio (fija review Finding "quiet SSE wait"): abre
         ``httpx.AsyncClient.stream`` y lee líneas de forma asíncrona bajo un
-        ``anyio.move_on_after(wait_seconds)``. Así un stream SILENCIOSO tras ``: open`` se
-        corta en el presupuesto wall-clock (frontera de batch NORMAL, ``done=false``), SIN
-        esperar al read-timeout de httpx y SIN bloquear el event loop de streamable-HTTP.
+        ``anyio.move_on_after(wait_seconds)``. Así un stream SILENCIOSO (antes O después de
+        ``: open``) se corta en el presupuesto wall-clock (frontera de batch NORMAL,
+        ``done=false``), SIN esperar al read-timeout de httpx y SIN bloquear el event loop de
+        streamable-HTTP. El deadline envuelve TAMBIÉN la ADQUISICIÓN de la respuesta
+        (``client.stream(...)`` espera status+cabeceras) y el drenaje del cuerpo de error de
+        un non-2xx (fija review Finding "SSE pre-header wait escapes the deadline"): un
+        upstream que acepta la conexión pero retiene cabeceras/cuerpo queda acotado por
+        ``wait_seconds``, no solo por el connect timeout.
 
         Un corte por deadline es DISTINTO de un fallo de conexión/HTTP:
           - deadline/cap -> ``stop_reason`` ``STOP_DEADLINE``/``STOP_CAP`` y ``error=None``
@@ -479,6 +557,7 @@ class HermesApiClient:
         batcher = SseBatcher(after_seq=after_seq, max_events=max_events)
         cap_reason: Optional[str] = None  # STOP_CAP/STOP_TERMINAL si un tope cerró la página
         hit_deadline = False
+        http_error: Optional[dict[str, Any]] = None  # sobre {"error":...} de un non-2xx
 
         try:
             # Read-timeout de httpx = None: el corte REAL por tiempo lo hace
@@ -489,22 +568,30 @@ class HermesApiClient:
                 connect=min(self._timeout, 10.0),
                 read=None, write=self._timeout, pool=self._timeout,
             )
-            async with httpx.AsyncClient(timeout=stream_timeout) as client:
-                async with client.stream("GET", url, headers=headers) as resp:
-                    if not resp.is_success:
-                        await resp.aread()
-                        error = self._handle_response(resp)
-                        return [], after_seq, error, "error"
-                    # Lectura asíncrona de líneas bajo deadline wall-clock. Al expirar, se
-                    # cancela el aiter (frontera de batch NORMAL, no error). Se para también
-                    # en cuanto el batcher señala un tope, SIN bufferizar el resto del stream.
-                    with anyio.move_on_after(effective_wait) as scope:
-                        async for line in resp.aiter_lines():
-                            cap_reason = batcher.feed(line)
-                            if cap_reason is not None:
-                                break
-                    if scope.cancelled_caught:
-                        hit_deadline = True
+            # El deadline wall-clock envuelve TODO el ciclo de vida del stream: la adquisición
+            # de la respuesta (status+cabeceras), el drenaje del cuerpo de error en un non-2xx
+            # y la lectura de líneas del cuerpo 2xx (fija review Finding "pre-header wait
+            # escapes the deadline"). Si expira ANTES de tener respuesta/cabeceras,
+            # cancelled_caught -> hit_deadline (frontera NORMAL, no error): el read-timeout
+            # está deshabilitado, así que sin este scope un upstream que retiene cabeceras
+            # colgaría indefinidamente.
+            with anyio.move_on_after(effective_wait) as scope:
+                async with httpx.AsyncClient(timeout=stream_timeout) as client:
+                    async with client.stream("GET", url, headers=headers) as resp:
+                        if not resp.is_success:
+                            # Drena el cuerpo de error DENTRO del mismo deadline (un cuerpo que
+                            # no cierra no puede mantener la llamada abierta más allá de él).
+                            await resp.aread()
+                            http_error = self._handle_response(resp)
+                        else:
+                            # Lectura asíncrona de líneas. Se para en cuanto el batcher señala
+                            # un tope, SIN bufferizar el resto del stream.
+                            async for line in resp.aiter_lines():
+                                cap_reason = batcher.feed(line)
+                                if cap_reason is not None:
+                                    break
+            if scope.cancelled_caught:
+                hit_deadline = True
         except httpx.HTTPError as exc:
             # Fallo de conexión/HTTP: sobre {"error": {...}} COMPLETO (misma forma que el
             # resto del cliente), nunca un dict sintético {"_error": ...}. Los eventos
@@ -512,6 +599,9 @@ class HermesApiClient:
             error = self._unreachable(exc)
             return batcher.events, batcher.next_cursor, error, "error"
 
+        if http_error is not None:
+            # non-2xx con cabeceras ya recibidas dentro del deadline: sobre de error completo.
+            return [], after_seq, http_error, "error"
         if cap_reason is not None:
             # Un tope (max_events/byte_budget) o el evento terminal cerró la página.
             return batcher.events, batcher.next_cursor, None, cap_reason

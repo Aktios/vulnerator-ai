@@ -343,7 +343,7 @@ Five tools + a health check, mapped 1:1 onto `:8642`:
 | --- | --- |
 | `start_pentest(input, scope, …)` | starts a run (`POST /v1/runs`); returns `{run_id, status, replayed}` |
 | `get_run_status(run_id)` | the full run object (status + `completed`/`partial`/`interrupted` + output + usage) |
-| `stream_run_events(run_id, cursor, …)` | pages the SSE events with a `seq` cursor (`{events, next_cursor, done}`); also emits MCP progress over streamable-HTTP |
+| `stream_run_events(run_id, cursor, …)` | pages the SSE events with a `seq` cursor (`{events, next_cursor, done}`); also emits one MCP progress notification per page (batch-completion telemetry) over streamable-HTTP |
 | `steer_run(run_id, input)` | injects a correction (`POST …/steer`); surfaces the 409 `run_not_accepting_steer` verbatim |
 | `stop_run(run_id)` | stops the run (`POST …/stop`); returns the full run object |
 | `health()` | upstream `GET /health` (`{status, platform, version}`) |

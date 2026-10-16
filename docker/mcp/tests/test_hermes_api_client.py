@@ -139,6 +139,56 @@ def test_parser_byte_budget_two_small_events_both_fit():
     assert reason == hac.STOP_DRAINED
 
 
+# ------------------------------------------------------------------ techo absoluto por evento
+
+
+def test_parser_oversized_single_event_is_placeholdered():
+    # Fija el blocking Finding "single SSE event has no absolute size limit": un ÚNICO evento
+    # cuyo JSON supera el techo absoluto NO se emite verbatim (su payload no confiable podría
+    # exceder el límite ~1 MiB del transporte). Se emite un placeholder cursor-safe pequeño que
+    # conserva los metadatos de wire + un marcador de truncado, SIN el payload.
+    huge = "Z" * 5_000
+    raw = _sse_message(7, event="tool.completed", preview=huge)
+    events, next_cursor, reason = hac.batch_sse_events(
+        _lines(raw), max_single_event_bytes=1_000
+    )
+    assert len(events) == 1
+    ev = events[0]
+    # El payload no confiable NO se reenvía.
+    assert "preview" not in ev
+    assert huge not in json.dumps(ev)
+    # El placeholder es PEQUEÑO (muy por debajo del techo) y marca el truncado.
+    assert len(json.dumps(ev)) < 1_000
+    assert ev["vulnerator_mcp_oversized"]["serialized_bytes"] > 1_000
+    assert ev["vulnerator_mcp_oversized"]["limit_bytes"] == 1_000
+    # Metadatos de wire preservados -> el cursor AVANZA (no se atasca la paginación).
+    assert ev["event"] == "tool.completed"
+    assert ev["seq"] == 7
+    assert next_cursor == 7
+    assert reason == hac.STOP_CAP
+
+
+def test_parser_oversized_event_after_normal_closes_page_first():
+    # Si la página YA tiene un evento normal, el oversized NO se mezcla: se cierra la página
+    # ANTES (STOP_CAP) y su seq NO avanza, para reprocesarlo con la página vacía (y entonces
+    # placeholderearlo). Así nunca se pierde ni se mezcla con eventos normales.
+    small = _sse_message(1, text="ok")
+    huge = _sse_message(2, event="tool.completed", preview="Q" * 5_000)
+    events, next_cursor, reason = hac.batch_sse_events(
+        _lines(small + huge), max_single_event_bytes=1_000
+    )
+    assert [e["seq"] for e in events] == [1]  # solo el normal
+    assert next_cursor == 1  # el oversized queda pendiente (se reprocesa la próxima página)
+    assert reason == hac.STOP_CAP
+    # Página siguiente (empezando tras el seq 1): el oversized se placeholderea.
+    events2, next_cursor2, reason2 = hac.batch_sse_events(
+        _lines(huge), after_seq=1, max_single_event_bytes=1_000
+    )
+    assert len(events2) == 1
+    assert "vulnerator_mcp_oversized" in events2[0]
+    assert events2[0]["seq"] == 2 and next_cursor2 == 2
+
+
 # ------------------------------------------------------------------ HermesApiClient
 
 
@@ -399,6 +449,28 @@ def test_iter_events_terminal_event_stops(monkeypatch):
     assert error is None
     assert [e["seq"] for e in events] == [1, 2]  # para en el terminal
     assert reason == hac.STOP_TERMINAL
+
+
+def test_iter_events_deadline_covers_pre_header_stall(monkeypatch):
+    # Fija el blocking Finding "SSE pre-header wait escapes the deadline": si el upstream
+    # ACEPTA la conexión pero RETIENE las cabeceras más allá de wait_seconds, iter_events debe
+    # cortar por el deadline wall-clock (STOP_DEADLINE, frontera NORMAL sin error), NO colgar.
+    # El handler async duerme más que wait_seconds ANTES de devolver la respuesta/cabeceras.
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await anyio.sleep(5.0)  # retiene cabeceras (read-timeout está deshabilitado)
+        return httpx.Response(200, text=_sse_message(1),
+                              headers={"content-type": "text/event-stream"})
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, next_cursor, error, reason = anyio.run(
+        lambda: client.iter_events("run_x", after_seq=0, wait_seconds=0.2)
+    )
+    # Cortó por el deadline durante la adquisición de cabeceras: sin eventos, SIN error.
+    assert events == []
+    assert error is None
+    assert reason == hac.STOP_DEADLINE
+    assert next_cursor == 0
 
 
 def test_iter_events_invalid_run_id_no_network(monkeypatch):
