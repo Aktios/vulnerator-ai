@@ -251,6 +251,69 @@ services:
     # NO ports section: the browser MCP is NOT published to the host; internal docker network only.
     restart: unless-stopped
 
+  vulnerator-mcp:
+    # 4th container (DEFAULT): a thin MCP front door over Hermes' :8642 runs API so external
+    # MCP clients (Claude Code / Kiro / BugTraceAI) can trigger/observe/steer/stop a pentest
+    # as MCP tools. It is UP BY DEFAULT because the product's intended UX is driving the engine
+    # from an MCP client. It wraps, does NOT replace, the HTTP API: it exposes ONLY the runs
+    # lifecycle (no raw kali_run, no /v1/chat/completions) so the client stays a trigger/observer,
+    # never the brain.
+    #
+    # SECURITY: this service is FAIL-CLOSED on VULNERATOR_MCP_INBOUND_TOKEN — it will NOT start
+    # without it (both at the compose `:?` level below and inside the server). That token gates
+    # the clients -> vulnerator-mcp edge ONLY; it is a SEPARATE token from HERMES_API_SERVER_KEY
+    # and does NOT re-protect the pre-existing :8642 host exposure (which stays under its own
+    # Bearer). By default NO host port is published (internal docker network only, like
+    # playwright-mcp). This MCP layer adds REACHABILITY, not safety: the engine has no
+    # scope-guard/consent/audit. For LOCAL Claude Code / Kiro the RECOMMENDED path is the stdio
+    # mode (zero network surface, no token) via `docker run -i` — see README; this default-up
+    # service is the streamable-http front door for in-docker consumers and host-published use.
+    build:
+      context: .
+      dockerfile: docker/mcp/Dockerfile
+      platforms:
+        - linux/arm64
+        - linux/amd64
+    image: vulnerator-ai-mcp:dev
+    environment:
+      # Upstream hop to Hermes by service DNS (internal docker network).
+      HERMES_API_BASE_URL: "http://ooda-agent:8642"
+      # Upstream PASS-THROUGH Bearer — fail-closed `:?` like the base ooda-agent.
+      HERMES_API_SERVER_KEY: "${HERMES_API_SERVER_KEY:?Falta HERMES_API_SERVER_KEY - genera uno con 'openssl rand -hex 32' (min 8 chars) y ponlo en .env}"
+      # INBOUND token (clients -> vulnerator-mcp). REQUIRED, fail-closed `:?`: bringing the
+      # default stack up without it aborts with a clear message (defense in depth: compose +
+      # process). SEPARATE from HERMES_API_SERVER_KEY (gates a different edge). stdio mode does
+      # NOT need it, but the default-up streamable-http service does.
+      VULNERATOR_MCP_INBOUND_TOKEN: "${VULNERATOR_MCP_INBOUND_TOKEN:?Falta VULNERATOR_MCP_INBOUND_TOKEN - genera uno con 'openssl rand -hex 32' y ponlo en .env (lo exige el servicio MCP streamable-http, que viene levantado por defecto)}"
+      VULNERATOR_MCP_TRANSPORT: "streamable-http"
+      # Bind INSIDE the container (not a host publication).
+      VULNERATOR_MCP_HOST: "0.0.0.0"
+      VULNERATOR_MCP_PORT: "8700"
+    # Host publication is OPT-IN and OFF by default: with NO ports: block the service is
+    # reachable ONLY on the internal docker network (http://vulnerator-mcp:8700), exactly like
+    # playwright-mcp/juice-shop. To publish on a CONTROLLED machine, UNCOMMENT the block below
+    # (optionally set VULNERATOR_MCP_HOST_PORT in .env; empty => the 8700 default). Publishing
+    # exposes the no-guardrails engine's trigger API to the host — do it deliberately and keep
+    # the inbound token secret. (Do NOT use ":8700": that publishes on a RANDOM host port.)
+    # ports:
+    #   - "${VULNERATOR_MCP_HOST_PORT:-8700}:8700"
+    depends_on:
+      # service_started (implicit): the base ooda-agent defines NO healthcheck, so
+      # service_healthy is not usable against it. Readiness is handled at the tool layer: every
+      # tool returns upstream_unreachable until Hermes is live, so this server can start before
+      # Hermes finishes booting without crashing. Do NOT upgrade this to service_healthy.
+      - ooda-agent
+    restart: unless-stopped
+    # HEALTHCHECK: stdlib python (python:3.13-slim ships no curl) probing the DEDICATED /healthz
+    # route, which the auth middleware leaves open with an exact-match carve-out (no token
+    # needed). "/" is the MCP endpoint and DOES require the token.
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys,os,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('VULNERATOR_MCP_PORT','8700'), timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   # Hermes state (profile + SQLite WAL). NAMED on purpose: avoids the bind-mount
   # that corrupts the SQLite WAL on macOS virtiofs.

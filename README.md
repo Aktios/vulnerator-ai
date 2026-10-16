@@ -45,11 +45,12 @@ tools run on a Kali governed by an MCP server. Hermes decides what
 to run and launches it **directly** against the target through the Kali MCP.
 
 It is a deliberately minimal design: **no core, no REST API, no UI, no gates**.
-Three containers (the agent and two MCP servers) and the agent driving end to end.
+Four containers (the agent, two tool MCP servers and the MCP front door) and the agent driving
+end to end.
 
-## Architecture (3 containers)
+## Architecture (4 containers)
 
-![Vulnerator AI system architecture: an external assistant (Kiro/Claude) triggers and observes Hermes over HTTP (:8642, Bearer); Hermes is the OODA brain, reasoning with mistralai/mistral-large on OpenRouter and driving the kali-mcp (:8900) and playwright-mcp (:8931) servers over MCP; kali runs the pentest tools against the authorized target. ATT&CK is the Orient language of the loop.](docs/architecture.svg)
+![Vulnerator AI system architecture: an MCP client (Claude Code / Kiro / BugTraceAI) drives a pentest THROUGH the vulnerator-mcp front door (MCP, :8700 internal), which forwards to Hermes' :8642 runs API over HTTP Bearer; an external assistant can still trigger/observe Hermes directly over :8642. Hermes is the OODA brain, reasoning with mistralai/mistral-large on OpenRouter and driving the kali-mcp (:8900) and playwright-mcp (:8931) servers over MCP; kali runs the pentest tools against the authorized target. ATT&CK is the Orient language of the loop.](docs/architecture.svg)
 
 - **kali** — deterministic runtime for pentest and collection tools (nmap, Prowler,
   ScoutSuite, Cloudsplaining, ...). Exposes a `kali-mcp` server on `:8900` (and the artifacts
@@ -63,14 +64,19 @@ Three containers (the agent and two MCP servers) and the agent driving end to en
   **published to the host** by default so you can pilot it from an external assistant — see
   "Pilot Hermes from an external assistant").
 
-There are no `api` or `ui` services: the agent talks directly to the MCPs (Kali and browser).
+- **vulnerator-mcp** — a thin MCP **front door** over Hermes' `:8642` runs API so external MCP
+  clients (Claude Code / Kiro, BugTraceAI, ...) can trigger/observe/steer/stop a pentest as MCP
+  tools. It is **up by default** (4th container) because the intended UX is driving the engine
+  from an MCP client. In the default stack it runs **streamable-HTTP on the internal network**
+  (`http://vulnerator-mcp:8700`, **no host port**) and is **fail-closed** on
+  `VULNERATOR_MCP_INBOUND_TOKEN`. For **local** Claude Code / Kiro the recommended path is instead
+  the **stdio** mode (`docker run -i …`, zero network surface, no token). It wraps, does **not**
+  replace, the HTTP API: it exposes **only** the runs lifecycle (no raw `kali_run`, no
+  `/v1/chat/completions`) so the client stays a trigger/observer, never the brain. See "Consume
+  Hermes from an MCP client (`vulnerator-mcp`)" below.
 
-There is an **OPTIONAL 4th container** you can layer on top: **vulnerator-mcp** — a thin MCP
-front door over Hermes' `:8642` runs API so external MCP clients (Claude Code / Kiro,
-BugTraceAI, ...) can trigger/observe/steer/stop a pentest as MCP tools. It is **not** part of
-the default stack (the default `docker compose up` stays the 3 containers above); it is an
-opt-in overlay, the same way the Juice Shop target is. See "Consume Hermes from an MCP client
-(`vulnerator-mcp`)" below.
+There are no `api` or `ui` services: the agent talks directly to the MCPs (Kali and browser),
+and the MCP front door only forwards the runs lifecycle.
 
 ### Tools included in the Kali image
 
@@ -106,12 +112,13 @@ the template, which documents every variable:
 cp .env.example .env
 ```
 
-Open the `.env` and fill in the values. At a minimum you need the two required ones:
+Open the `.env` and fill in the values. At a minimum you need the three required ones:
 
 | Variable | Required | Where to put it / how to get it |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | **Yes** | Your OpenRouter API key (the provider of the LLM that reasons the OODA). Create it at <https://openrouter.ai/keys> and paste it into the `.env`. |
 | `HERMES_API_SERVER_KEY` | **Yes** | Key for Hermes' API server (min. 8 chars). Generate one with `openssl rand -hex 32` and paste it into the `.env`. It is also the Bearer to pilot Hermes over HTTP. |
+| `VULNERATOR_MCP_INBOUND_TOKEN` | **Yes** | Inbound Bearer for the `vulnerator-mcp` front door, which is **up by default** in streamable-HTTP mode. Generate one with `openssl rand -hex 32` and paste it into the `.env`. The default stack is **fail-closed** on this: `docker compose up` aborts without it. It is a **separate** secret from `HERMES_API_SERVER_KEY` and gates a different edge. (The local **stdio** mode for Claude Code / Kiro does not need it.) |
 
 The **AWS credentials are OPTIONAL**: they are only needed if you are going to use the cloud
 collection tools (Prowler / ScoutSuite / Cloudsplaining). If you are not auditing AWS, leave these
@@ -124,7 +131,7 @@ variables empty in the `.env`:
 | `AWS_SESSION_TOKEN` | No | Only for temporary credentials (STS). In the `.env`. |
 | `AWS_REGION` | No | Default region (e.g. `us-east-1`). In the `.env`. |
 | `OPENROUTER_MODEL` | No | Overrides the OpenRouter model Hermes reasons with. Empty = the profile default (`mistralai/mistral-large-4-0`). **Caveat:** the project uses Mistral Large on purpose because models like Claude (`anthropic/*`) refuse the authorized-offensive pentest framing (OpenRouter/Anthropic returns "violative cyber content"); overriding with such a model may make the agent refuse to work. |
-| `VULNERATOR_MCP_INBOUND_TOKEN` | Only for the optional `vulnerator-mcp` HTTP service | Inbound Bearer for the opt-in `docker-compose.mcp.yml` streamable-HTTP service. Generate with `openssl rand -hex 32`. It is a **separate** secret from `HERMES_API_SERVER_KEY` and gates a different edge. The service is **fail-closed**: it will not start without this. NOT needed for the default stack or for stdio mode. See "Consume Hermes from an MCP client". |
+| `VULNERATOR_MCP_HOST_PORT` | No | HOST port to publish the `vulnerator-mcp` streamable-HTTP server. By default it publishes **no** host port (internal docker network only). Set this **and** uncomment the service's `ports:` block in `docker-compose.yml` to publish on a controlled machine. |
 
 The rest of the `.env.example` variables (host ports, artifacts token, Prowler
 scoping) are optional and come with defaults; leave them empty unless you need to
@@ -333,9 +340,13 @@ scope rests entirely with the operator.
 ## Consume Hermes from an MCP client (`vulnerator-mcp`)
 
 If your tooling speaks **MCP** rather than raw HTTP (Claude Code, Kiro, Cursor, BugTraceAI, …),
-there is an OPTIONAL thin MCP server — **`vulnerator-mcp`** (`docker/mcp/`) — that wraps Hermes'
+the stack ships a thin MCP server — **`vulnerator-mcp`** (`docker/mcp/`) — that wraps Hermes'
 `:8642` runs API and exposes it as MCP tools. It wraps, it does **not** replace, the HTTP API: it
 exposes **only** the runs lifecycle, so the client stays a trigger/observer and never the brain.
+
+It runs in **two modes**: a **streamable-HTTP** service that is **up by default** with the stack
+(for in-docker consumers like BugTraceAI, and for host-published use), and a **stdio** mode that
+**local** Claude Code / Kiro spawn as a subprocess (recommended locally; zero network surface).
 
 Five tools + a health check, mapped 1:1 onto `:8642`:
 
@@ -394,28 +405,28 @@ entry (copy-paste; the stdio process reaches the host-published `:8642` via
 The upstream Bearer is a **pass-through** of `HERMES_API_SERVER_KEY` (no second secret is minted
 for the `:8642` hop).
 
-### In-docker / remote: streamable-HTTP (optional layered service)
+### In-docker / remote: streamable-HTTP (up by default)
 
-For an in-docker consumer (e.g. a BugTraceAI container on the same network) or a remote
-orchestrator, bring up the OPTIONAL layered service — it is **not** in the default stack:
+The streamable-HTTP service is part of the **default** stack, so a plain
 
 ```sh
 # requires VULNERATOR_MCP_INBOUND_TOKEN in .env (generate: openssl rand -hex 32)
-docker compose -f docker-compose.yml -f docker-compose.mcp.yml up -d --build
+docker compose up -d --build
 ```
 
-A plain `docker compose up` is unchanged (3 containers); this adds a 4th, `vulnerator-mcp`,
-reachable on the internal network at `http://vulnerator-mcp:8700` (upstream Hermes at
-`http://ooda-agent:8642`). Key properties:
+brings it up as the 4th container, `vulnerator-mcp`, reachable on the internal network at
+`http://vulnerator-mcp:8700` (upstream Hermes at `http://ooda-agent:8642`). An in-docker consumer
+(e.g. a BugTraceAI container on the same network) reaches it there with no extra steps. Key
+properties:
 
 - **Host publication is OFF by default.** The service declares no `ports:` block (internal
-  network only, like `playwright-mcp`/`juice-shop`). To publish on a **controlled** machine,
-  uncomment the `ports:` block in `docker-compose.mcp.yml` (optionally set
-  `VULNERATOR_MCP_HOST_PORT`).
-- **Mandatory, fail-closed inbound token.** The streamable-HTTP mode refuses to start without
-  `VULNERATOR_MCP_INBOUND_TOKEN`, and every request must carry
-  `Authorization: Bearer <VULNERATOR_MCP_INBOUND_TOKEN>` (a dedicated `/healthz` route is the one
-  exact-match exception). This token is **separate** from `HERMES_API_SERVER_KEY`.
+  network only, like `playwright-mcp`/`juice-shop`), so by default nothing is exposed to the
+  host. To publish on a **controlled** machine, set `VULNERATOR_MCP_HOST_PORT` in `.env` **and**
+  uncomment the `ports:` block of the `vulnerator-mcp` service in `docker-compose.yml`.
+- **Mandatory, fail-closed inbound token.** The default stack refuses to start without
+  `VULNERATOR_MCP_INBOUND_TOKEN` (compose `:?` guard + an in-process guard), and every request
+  must carry `Authorization: Bearer <VULNERATOR_MCP_INBOUND_TOKEN>` (a dedicated `/healthz` route
+  is the one exact-match exception). This token is **separate** from `HERMES_API_SERVER_KEY`.
 - **Threat model (read this).** The inbound token gates only the *clients → vulnerator-mcp* edge.
   It does **not** re-protect the pre-existing `:8642` host exposure, which stays under its own
   `HERMES_API_SERVER_KEY` Bearer (see "Security note" above). Publishing the MCP port is an

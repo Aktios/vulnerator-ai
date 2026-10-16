@@ -25,7 +25,7 @@ Transportes (uno/una imagen, dos modos, design §6):
     token, sin puerto). El cliente arranca el proceso (``docker run -i``).
   - streamable-http: para consumidores in-docker/remotos. FAIL-CLOSED en el token de entrada
     (``VULNERATOR_MCP_INBOUND_TOKEN``): NO arranca sin él. Bind interno a la red docker; sin
-    publicación al host por defecto (ver docker-compose.mcp.yml).
+    publicación al host por defecto (ver el servicio vulnerator-mcp en docker-compose.yml).
 """
 
 from __future__ import annotations

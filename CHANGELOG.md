@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.0] - 2026-10-16
 
 ### Added
-- **Optional `vulnerator-mcp` MCP front door over the Hermes `:8642` runs API.** A thin
+- **`vulnerator-mcp` MCP front door over the Hermes `:8642` runs API (up by default).** A thin
   FastMCP wrapper (`docker/mcp/`) that lets external MCP clients (Claude Code / Kiro locally
   over stdio; remote/containerized consumers like BugTraceAI over streamable-HTTP) trigger,
   observe, steer and stop a Hermes OODA pentest as MCP tools. It WRAPS, does not replace, the
@@ -21,12 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from `GET /health` and reported verbatim, never branched on. `stream_run_events` uses the
   event `seq` as a portable cursor (batched pages with `next_cursor`/`done`) and additionally
   emits MCP progress notifications over streamable-HTTP, degrading to pure batching on stdio.
-  Shipped as a NEW **optional layered `docker-compose.mcp.yml`** — NOT part of the default
-  stack, which stays 3 containers (`kali`, `ooda-agent`, `playwright-mcp`) — brought up with
-  `docker compose -f docker-compose.yml -f docker-compose.mcp.yml up -d --build`. The
-  streamable-HTTP service binds the internal docker network with host publication OFF by
-  default (no `ports:` block; opt-in by uncommenting it and/or setting
-  `VULNERATOR_MCP_HOST_PORT`) and is **fail-closed on a mandatory inbound token**
+  Shipped as a **4th service in the default `docker-compose.yml`** — the default stack is now
+  4 containers (`kali`, `ooda-agent`, `playwright-mcp`, `vulnerator-mcp`), brought up with a
+  plain `docker compose up -d --build` — because the product's intended UX is driving the
+  engine from an MCP client. The streamable-HTTP service binds the internal docker network with
+  host publication OFF by default (no `ports:` block; opt-in by setting
+  `VULNERATOR_MCP_HOST_PORT` and uncommenting the service's `ports:` block) and is **fail-closed
+  on a mandatory inbound token**
   (`VULNERATOR_MCP_INBOUND_TOKEN`): it refuses to start without one and rejects any request
   without the matching `Authorization: Bearer` (constant-time compare), with an exact-match
   carve-out for a dedicated `/healthz` route only. The same image also runs stdio for local

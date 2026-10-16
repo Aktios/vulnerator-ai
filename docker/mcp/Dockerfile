@@ -2,7 +2,7 @@
 #
 # UNA imagen, DOS modos de ejecucion (los selecciona entrypoint.sh):
 #   - stdio (default)      : el cliente arranca el proceso (docker run -i). Superficie cero.
-#   - streamable-http      : servicio opt-in (docker-compose.mcp.yml), fail-closed en el
+#   - streamable-http      : servicio por defecto (docker-compose.yml), fail-closed en el
 #                            token de entrada VULNERATOR_MCP_INBOUND_TOKEN.
 #
 # Multi-arch (linux/arm64 + linux/amd64). Base python:3.13-slim (NO Kali): este componente
