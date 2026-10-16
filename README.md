@@ -366,3 +366,32 @@ against the target, with no gatekeeper to validate the scope.
 
 This is **intentional**. Use it **only against explicitly authorized targets** and in
 a **controlled environment**. All responsibility for the scope rests with the operator.
+
+---
+
+<p align="center">
+  <sub><b>Built with</b></sub>
+</p>
+
+<p align="center">
+  <a href="https://www.docker.com/">
+    <img src="https://img.shields.io/badge/Docker-containers-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker containers">
+  </a>
+  &nbsp;
+  <a href="https://hermes-agent.nousresearch.com/">
+    <img src="https://img.shields.io/badge/Hermes%20Agent-Nous%20Research-7A5CFF?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=&logoColor=white" alt="Hermes Agent — Nous Research">
+  </a>
+  &nbsp;
+  <a href="https://www.kali.org/">
+    <img src="https://img.shields.io/badge/Kali%20Linux-pentest%20runtime-557C94?style=for-the-badge&logo=kalilinux&logoColor=white" alt="Kali Linux">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    Containerized with <a href="https://www.docker.com/">Docker</a> &middot;
+    driven by <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> from
+    <a href="https://nousresearch.com/">Nous Research</a> &middot;
+    tooling on <a href="https://www.kali.org/">Kali Linux</a>
+  </sub>
+</p>
