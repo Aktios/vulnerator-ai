@@ -1,0 +1,34 @@
+# Manifiesto de dependencias de la imagen vulnerator-mcp. Es la fuente de verdad de lo
+# que se instala con pip en docker/mcp/Dockerfile. Componente FINO: envuelve la API de
+# runs de Hermes (:8642); no corre lógica de pentest, así que su superficie de deps es
+# mínima (stdlib pura salvo las tres entradas de abajo).
+
+# SDK oficial de MCP (modelcontextprotocol/python-sdk). Lo usa el SERVIDOR
+#   vulnerator-mcp (docker/mcp/vulnerator_mcp_server.py: FastMCP + transportes
+#   stdio / streamable-HTTP) que consumen los clientes externos (Claude Code, Kiro,
+#   BugTraceAI).
+#
+#   Se fija a la línea 1.x (<2) a propósito, IGUAL que docker/kali/requirements.txt: el
+#   servidor usa la API 1.x de FastMCP, que v2 renombra/elimina. Mantener servidor y
+#   clientes en la misma era de protocolo evita un desajuste cliente/servidor. El
+#   contenedor Kali vivo corre mcp==1.30.0 (dentro de este rango): prueba de que la línea
+#   soporta `FastMCP.run(transport="streamable-http")` y `streamable_http_app()`.
+mcp>=1.28,<2
+
+# httpx: cliente HTTP del hop a :8642. Justificado (no es stdlib pura por un motivo
+#   concreto): GET /v1/runs/{id}/events es un stream SSE de larga vida que httpx.stream(...)
+#   consume limpiamente línea a línea; urllib de la stdlib no streamea SSE de forma
+#   cómoda. Todo lo demás del cliente es request/response plano pero se mantiene sobre el
+#   mismo cliente para una única ruta de auth/transporte.
+httpx
+
+# anyio: dependencia del transporte asíncrono del SDK mcp (streamable-HTTP), igual que en
+#   la imagen Kali. Se fija >=4 por el mismo motivo (API async de esa era).
+anyio>=4
+
+# uvicorn: servidor ASGI con el que se sirve la app streamable-http de FastMCP CUANDO la
+#   envolvemos con el middleware Bearer de auth de entrada (no podemos usar
+#   `mcp.run(transport="streamable-http")` directamente porque necesitamos interponer el
+#   middleware). Es dependencia transitiva del SDK mcp (streamable-HTTP), pero se declara
+#   explícita porque este servidor la importa y la invoca directamente (fail-closed si falta).
+uvicorn

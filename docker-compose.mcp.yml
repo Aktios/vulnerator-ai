@@ -1,0 +1,73 @@
+# =============================================================================
+# docker-compose.mcp.yml — OPTIONAL MCP front door over Hermes' :8642 runs API.
+# =============================================================================
+# OPTIONAL layered override, NOT part of the base stack (docker-compose.yml). Bring it up
+# explicitly alongside the base to expose a thin MCP server (vulnerator-mcp) that external
+# MCP clients (Claude Code / Kiro / BugTraceAI) can use to trigger/observe/steer/stop a
+# Hermes OODA pentest as MCP tools:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.mcp.yml up -d --build
+#
+# A plain `docker compose up` is UNCHANGED (3 containers: kali, ooda-agent, playwright-mcp).
+# This file adds a 4th container only when brought up explicitly. The service lives on the
+# SAME internal docker network: it reaches Hermes at http://ooda-agent:8642, and in-docker
+# MCP consumers reach it at http://vulnerator-mcp:8700 (service DNS).
+#
+# It wraps, does NOT replace, the HTTP API: it exposes ONLY the runs lifecycle (no raw
+# kali_run, no /v1/chat/completions) so the client stays a trigger/observer, never the brain.
+#
+# SECURITY (read this): this service is FAIL-CLOSED on VULNERATOR_MCP_INBOUND_TOKEN — it will
+# NOT start without it (both at the compose `:?` level below and inside the server). That
+# token gates the clients -> vulnerator-mcp edge ONLY; it is a SEPARATE token from
+# HERMES_API_SERVER_KEY and does NOT re-protect the pre-existing :8642 host exposure (which
+# stays under its own Bearer). By default NO host port is published (internal network only).
+# This MCP layer adds REACHABILITY, not safety: the engine has no scope-guard/consent/audit.
+
+services:
+  vulnerator-mcp:
+    build:
+      context: .
+      dockerfile: docker/mcp/Dockerfile
+      platforms:
+        - linux/arm64
+        - linux/amd64
+    image: vulnerator-ai-mcp:dev
+    environment:
+      # Hop upstream a Hermes por DNS de servicio (red interna docker).
+      HERMES_API_BASE_URL: "http://ooda-agent:8642"
+      # Bearer de PASS-THROUGH upstream — fail-closed `:?` como el ooda-agent base.
+      HERMES_API_SERVER_KEY: "${HERMES_API_SERVER_KEY:?Falta HERMES_API_SERVER_KEY - genera uno con 'openssl rand -hex 32' (min 8 chars) y ponlo en .env}"
+      # Token de ENTRADA (clientes -> vulnerator-mcp). REQUERIDO, fail-closed `:?`: traer este
+      # archivo sin token aborta con mensaje claro (defensa en profundidad: compose + proceso).
+      # Separado de HERMES_API_SERVER_KEY (gatea otra frontera). Solo necesario para ESTE
+      # servicio opt-in; el stack base de 3 contenedores no lo referencia.
+      VULNERATOR_MCP_INBOUND_TOKEN: "${VULNERATOR_MCP_INBOUND_TOKEN:?Falta VULNERATOR_MCP_INBOUND_TOKEN - genera uno con 'openssl rand -hex 32' y ponlo en .env (lo exige el servicio MCP streamable-http)}"
+      VULNERATOR_MCP_TRANSPORT: "streamable-http"
+      # Bind DENTRO del contenedor (no es una publicacion al host).
+      VULNERATOR_MCP_HOST: "0.0.0.0"
+      VULNERATOR_MCP_PORT: "8700"
+    # Host publication is OPT-IN and OFF by default: with NO ports: block the service is
+    # reachable ONLY on the internal docker network (http://vulnerator-mcp:8700), exactly
+    # like playwright-mcp/juice-shop. To publish on a CONTROLLED machine, UNCOMMENT the block
+    # below (set VULNERATOR_MCP_HOST_PORT in .env or accept the 8700 default). Publishing
+    # exposes the no-guardrails engine's trigger API to the host — do it deliberately and keep
+    # the inbound token secret. (Do NOT use ":8700": that publishes on a RANDOM host port.)
+    # ports:
+    #   - "${VULNERATOR_MCP_HOST_PORT:-8700}:8700"
+    depends_on:
+      # service_started (implicito): el ooda-agent base NO define healthcheck, asi que
+      # service_healthy no es usable contra el. La readiness se maneja en la capa de tools:
+      # cada tool devuelve upstream_unreachable hasta que Hermes esta vivo, asi que este
+      # servidor puede arrancar antes de que Hermes termine de bootear sin romperse. NO
+      # subir esto a service_healthy.
+      - ooda-agent
+    restart: unless-stopped
+    # HEALTHCHECK: stdlib python (python:3.13-slim no trae curl) sondeando la ruta DEDICADA
+    # /healthz, que el middleware de auth deja abierta con un carve-out de match exacto (no
+    # necesita el token). "/" es el endpoint MCP y SI requiere token.
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys,os,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('VULNERATOR_MCP_PORT','8700'), timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
