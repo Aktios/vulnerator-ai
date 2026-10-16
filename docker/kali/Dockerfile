@@ -140,6 +140,11 @@ COPY docker/kali/finding_store.py ./finding_store.py
 # Generador del informe de pentest (skill pentest-report): LEE el store de hallazgos y
 # produce un Markdown que deja como artefacto. STDLIB PURA; se invoca con kali_run.
 COPY docker/kali/report_gen.py ./report_gen.py
+# Scope-guard (opt-in, v1.3.0): valida DETERMINISTAMENTE el destino de kali_run/kali_exec
+# ANTES de ejecutar. STDLIB PURA. Lo importa kali_mcp_server (import scope_guard), por lo que
+# DEBE estar en la imagen aunque el guard esté desactivado por defecto; sin este COPY el
+# servidor aborta al arrancar con ModuleNotFoundError: No module named 'scope_guard'.
+COPY docker/kali/scope_guard.py ./scope_guard.py
 COPY docker/kali/kali_mcp_server.py ./kali_mcp_server.py
 
 # Puerto del servidor kali-mcp. Overridable por entorno (KALI_MCP_PORT) sin
