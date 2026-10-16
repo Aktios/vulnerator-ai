@@ -49,6 +49,29 @@ RUN apt-get update \
       git \
  && rm -rf /var/lib/apt/lists/*
 
+# CURATED set of pentest CLIs that the skills (web-pentest, recon) assume exist and invoke via
+# kali_run. The base kalilinux/kali-rolling image is MINIMAL and ships NONE of these, so without
+# this layer those skills would fail at runtime. We bake a SMALL, deliberate selection (NOT the
+# kali-linux-headless metapackage) to fix that latent gap while keeping the image reasonably sized:
+#   - nmap, whatweb, nuclei, ffuf, sqlmap, gobuster : web/recon tools used by the skills.
+#   - impacket-scripts                              : Impacket CLI helpers (AD/network).
+#   - bloodhound.py                                 : BloodHound Python ingestor (AD).
+# All package names were confirmed installable in kali-rolling (apt-get install --dry-run). Own
+# RUN layer with --no-install-recommends + rm -rf /var/lib/apt/lists/*, consistent with the style
+# above. Tools NOT baked here (anything else a skill needs ad-hoc) are still `apt install`-able on
+# the fly inside the ephemeral kali container.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      nmap \
+      whatweb \
+      nuclei \
+      ffuf \
+      sqlmap \
+      gobuster \
+      impacket-scripts \
+      bloodhound.py \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /opt/kali-mcp
 
 # Virtualenv dedicado con Python 3.13 (compatible con Prowler). Ponerlo primero en

@@ -65,6 +65,30 @@ Three containers (the agent and two MCP servers) and the agent driving end to en
 
 There are no `api` or `ui` services: the agent talks directly to the MCPs (Kali and browser).
 
+### Tools included in the Kali image
+
+The Kali image bakes in a **curated** set of pentest CLIs the skills assume exist and invoke via
+`kali_run` (the base `kalilinux/kali-rolling` image is minimal and ships none of them). This is a
+deliberate, small selection — **not** the full `kali-linux-headless` metapackage — to keep the
+image reasonably sized:
+
+| Baked-in tool | Used for |
+| --- | --- |
+| `nmap` | network/port/service enumeration |
+| `whatweb` | web tech fingerprinting |
+| `nuclei` | templated vulnerability scanning |
+| `ffuf` | web fuzzing |
+| `sqlmap` | SQL injection testing |
+| `gobuster` | directory/DNS/vhost brute forcing |
+| `impacket-scripts` | Impacket CLI helpers (AD/network) — invoked with the `impacket-` prefix, e.g. `impacket-secretsdump`, `impacket-GetUserSPNs` |
+| `bloodhound.py` | BloodHound Python ingestor (AD) — command `bloodhound-python` |
+
+Plus the cloud-collection tooling in the Python venv (Prowler, ScoutSuite, Cloudsplaining, Pacu).
+Anything else a specific engagement needs can still be `apt install`-ed on the fly inside the
+`kali` container; note it lives in the container's ephemeral layer and disappears on the next
+`down`/`up` (bake it into the `Dockerfile` to make it permanent — see "Start clean between
+exercises").
+
 ## How to bring it up
 
 **All keys and credentials go in a `.env` file** at the repo root. It is not
@@ -147,6 +171,35 @@ in natural language; Hermes drives the OODA and runs the tools on Kali
 Hermes' API server on `:8642`. That API server is an **alternative programmatic** path
 (OpenAI-compatible) and is **published to the host** by default, to pilot Hermes from an
 external assistant without entering the TUI (see the next section).
+
+### Quickstart against a lab target (Juice Shop)
+
+To practice the `web-pentest` skill without going out to the internet or touching real systems,
+the repo ships an **optional** target override, `docker-compose.target.yml`, that adds an
+[OWASP Juice Shop](https://owasp.org/www-project-juice-shop/) service. Juice Shop is a
+**deliberately-vulnerable** web application (OWASP project), the de facto standard for practicing
+web pentesting (XSS, SQLi, broken auth, etc.).
+
+Bring the whole stack up **with** the target by layering both compose files:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.target.yml up -d --build
+```
+
+The target joins the **same internal docker network** and publishes **no port to the host**, so it
+only exists inside the docker environment — scoping the exercise to a controlled lab. Hermes/Kali
+reach it by its DNS name at **`http://juice-shop:3000`**. Point an engagement at that URL, e.g. via
+the interactive TUI:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.target.yml exec -it ooda-agent hermes chat
+# then ask, in natural language:
+#   "Authorized web pentest against http://juice-shop:3000 (scope: that host only).
+#    Enumerate, fingerprint, and test for injection/auth flaws. Report confirmed findings."
+```
+
+This is the authorized target for practicing the `web-pentest` skill. Only the web lab is in scope
+here (no AD or other labs for now).
 
 ## Pilot Hermes from an external assistant (Kiro / Claude)
 

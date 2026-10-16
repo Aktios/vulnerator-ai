@@ -103,6 +103,12 @@ services:
           # though for Ollama you normally want an Ollama-served model name here).
           if [ -n "$$OLLAMA_MODEL" ]; then
             hermes config set model.default "$$OLLAMA_MODEL" >/dev/null
+          else
+            # D1 warning (non-fatal): no OLLAMA_MODEL set, so the profile default model NAME
+            # (mistralai/mistral-large-4-0) is now pointed at the Ollama endpoint, which almost
+            # certainly does NOT serve a model by that name. Warn but DO NOT abort: the operator
+            # most likely wants to set OLLAMA_MODEL to an Ollama-served model name.
+            echo "WARNING: OLLAMA_BASE_URL is set but OLLAMA_MODEL is empty. The profile default model name (mistralai/mistral-large-4-0) will be used against the Ollama endpoint, which probably does not serve it. Set OLLAMA_MODEL to an Ollama-served model name (e.g. qwen2.5-coder:32b)." >&2
           fi
         else
           # --- OpenRouter mode (default, OLLAMA_BASE_URL empty) ------------------
