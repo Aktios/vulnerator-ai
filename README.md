@@ -1,9 +1,5 @@
 <p align="center">
-  <img src="docs/vulnerator-ai-logo.png" alt="VULNERATOR AI — official logo: spiky death-metal lettering on a black background, with a cyberpunk circuit brain and PCB traces spilling out of the letters." width="640">
-</p>
-
-<p align="center">
-  <sub>† † † &nbsp; summoned from the depths of the OODA abyss &nbsp; † † †</sub>
+  <img src="docs/vulnerator-ai-logo.png" alt="VULNERATOR AI — official logo: spiky death-metal lettering on a black background with a cyberpunk circuit brain and PCB traces, framed by the taglines 'Unholy Pentest', 'offerings to the Kali' and 'summoned from the depths of the OODA abyss · mmxxvi'." width="720">
 </p>
 
 OODA pentest driven by **Hermes** talking **directly** to a **Kali** container via MCP.
