@@ -46,10 +46,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a deadline-aware cancellation so a quiet upstream ends the batch at `wait_seconds` instead of
   stalling on the network timeout — the deadline now also wraps response acquisition and the
   error-body drain, so an upstream that accepts the connection but withholds headers is bounded
-  by `wait_seconds` too (not just the connect timeout); a single SSE event is bounded by an
-  absolute per-event ceiling (~512 KiB) and, if exceeded, is replaced by a small cursor-safe
-  placeholder (metadata preserved, untrusted payload withheld) so one oversized event can never
-  exceed the transport message limit; terminality requires the literal boolean `True`; a stream
+  by `wait_seconds` too (not just the connect timeout) — and if a non-2xx error body itself
+  stalls past the deadline, the already-observed status is still reported as a bare
+  `upstream_error` envelope (terminal for paging) instead of degrading to an empty deadline page
+  that a loop-until-`done` client would re-issue; a single SSE event is bounded by an
+  absolute per-event ceiling (~512 KiB) and, if a single event exceeds it, the batch fails loud:
+  the event is NOT forwarded (neither verbatim — truncating an opaque event would break
+  pass-through — nor as an in-`events` placeholder, which would drop the untrusted payload and
+  consume the cursor) and the cursor is NOT advanced; instead a bare `{"error": {...}}` envelope
+  with `code: "oversized_event"` carries the event metadata (seq/type/size, payload withheld),
+  terminal for paging, and the real terminal state is recovered via `get_run_status` — so an
+  oversized event can never exceed the transport message limit, never silently drops its payload,
+  and never returns a `run.completed` marker with `done: false`; sub-ceiling events on the same
+  page are delivered complete first; terminality requires the literal boolean `True`; a stream
   failure preserves the full `{"error": {...}}` envelope (surfaced under `stream_error` after
   partial events, or `terminality_error` for a failed confirming `get_run`), while a failure
   received BEFORE any event (invalid `run_id`, `run_not_found`, unreachable) returns the bare

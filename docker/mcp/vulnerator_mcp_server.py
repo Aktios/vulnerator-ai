@@ -230,7 +230,18 @@ async def stream_run_events(
     DESNUDO —igual que el resto de tools— y es TERMINAL para la paginación: NO se envuelve en
     la forma de batch, así que un cliente que itere solo sobre ``done`` no entra en un bucle
     de reintento. Si el fallo llega DESPUÉS de eventos parciales, se devuelven esos eventos
-    junto al sobre COMPLETO bajo ``stream_error`` con ``done=False``. Si la confirmación de
+    junto al sobre COMPLETO bajo ``stream_error`` con ``done=False``.
+
+    EVENTO SOBREDIMENSIONADO (contrato fail-loud): si un ÚNICO evento SSE serializa por encima
+    del techo absoluto por evento (512 KiB), NO se reenvía —ni verbatim (truncar un evento
+    opaco violaría el pass-through) ni como placeholder dentro de ``events`` (descartaría el
+    payload y avanzaría el cursor)—. En su lugar se devuelve un sobre DESNUDO
+    ``{"error": {... "code": "oversized_event", "oversized_event": {metadatos SIN payload}}}``
+    y el cursor NO avanza (el ``seq`` queda recuperable). Es terminal para la paginación; para
+    recuperar el estado terminal del run (si el evento era ``run.completed``) usa
+    ``get_run_status``, o avanza ``cursor`` por encima del ``seq`` indicado para saltarlo. Los
+    eventos normales que precedan al sobredimensionado en una página se entregan COMPLETOS
+    antes (el sobredimensionado se reprocesa en la siguiente página vacía). Si la confirmación de
     terminalidad (``get_run`` tras un drenado) falla, su sobre COMPLETO va bajo
     ``terminality_error`` (misma forma). ``wait_seconds`` NO es un error: corta el batch de
     forma asíncrona (cancelación por deadline) sin esperar al timeout de red ni bloquear el

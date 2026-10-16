@@ -365,7 +365,7 @@ stdio has **zero network surface**: the client spawns the server as a subprocess
 stdin/stdout — no listener, no inbound token, no port. Build the image once
 (`docker build -f docker/mcp/Dockerfile -t vulnerator-ai-mcp:dev .`), then add an `mcpServers`
 entry (copy-paste; the stdio process reaches the host-published `:8642` via
-`host.docker.internal`):
+`host.docker.internal`, which the `--add-host` below maps to the host gateway):
 
 ```json
 {
@@ -374,6 +374,7 @@ entry (copy-paste; the stdio process reaches the host-published `:8642` via
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
+        "--add-host", "host.docker.internal:host-gateway",
         "-e", "HERMES_API_SERVER_KEY",
         "-e", "HERMES_API_BASE_URL=http://host.docker.internal:8642",
         "vulnerator-ai-mcp:dev"
@@ -383,6 +384,12 @@ entry (copy-paste; the stdio process reaches the host-published `:8642` via
   }
 }
 ```
+
+> **Linux note.** On Docker Desktop (macOS/Windows) `host.docker.internal` resolves out of the
+> box, so the `--add-host` is optional there; on **stock Linux Docker** it does **not** resolve
+> unless you pass `--add-host=host.docker.internal:host-gateway` (included above). If you prefer,
+> point `HERMES_API_BASE_URL` at the host's reachable address instead (e.g. the Docker bridge
+> gateway or the host IP).
 
 The upstream Bearer is a **pass-through** of `HERMES_API_SERVER_KEY` (no second secret is minted
 for the `:8642` hop).

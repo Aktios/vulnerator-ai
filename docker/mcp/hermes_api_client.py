@@ -57,10 +57,25 @@ DEFAULT_BYTE_BUDGET = 256 * 1024
 # página vacía se admitía por anti-starvation sin tope superior, de modo que un
 # `tool.completed.preview`/`text` no confiable podía exceder el límite ~1 MiB de un mensaje
 # del transporte streamable-http. Este techo acota ese caso: un evento cuyo JSON supere
-# MAX_SINGLE_EVENT_BYTES NO se emite verbatim (truncarlo violaría el pass-through opaco); en
-# su lugar el parser produce un PLACEHOLDER estructurado y cursor-safe (ver _oversized_event)
-# que avanza el cursor para que la paginación no se atasque, informando seq/tipo/tamaño sin
-# el payload. 512 KiB deja margen holgado bajo 1 MiB tras el overhead del sobre MCP.
+# MAX_SINGLE_EVENT_BYTES NO se emite (ni verbatim ni como placeholder dentro de `events`).
+#
+# CONTRATO FAIL-LOUD (fija los blocking Findings de la revisión 4 — "oversized event
+# placeholder breaks opaque verbatim pass-through" y "oversized terminal run.completed can
+# return done:false"): un placeholder DENTRO de `events` violaba dos invariantes a la vez:
+#   (a) descartaba el payload no confiable (`preview`/`text`/`delta`/`output` y cualquier
+#       campo futuro) AVANZANDO el cursor, dejando el `seq` original irrecuperable — rompe el
+#       pass-through opaco/verbatim/version-tolerante; y
+#   (b) si el evento sobredimensionado era `run.completed`, el placeholder conservaba ese
+#       `event` mientras la página cerraba con STOP_CAP (`done=false`), devolviendo un
+#       marcador terminal con semántica no terminal.
+# En su lugar, el batcher NO emite nada dentro de `events` para un evento sobredimensionado,
+# NO avanza el cursor (el `seq` queda recuperable) y señala STOP_OVERSIZE con los metadatos
+# del evento (seq/tipo/tamaño/límite). El servidor los traduce a un sobre de error DESNUDO
+# fuera de `events` —fail-loud y terminal para la paginación, igual que un pre-evento
+# run_not_found— sin fingir ser un evento Hermes ni consumir el cursor. Los eventos que SÍ
+# caben bajo el techo se entregan COMPLETOS antes (si la página ya tenía eventos, se cierra
+# primero y el sobredimensionado se reprocesa en la siguiente página vacía).
+# 512 KiB deja margen holgado bajo 1 MiB tras el overhead del sobre MCP.
 MAX_SINGLE_EVENT_BYTES = 512 * 1024
 # Presupuesto wall-clock por batch: una llamada a la tool nunca cuelga al cliente esperando
 # un stream silencioso.
@@ -74,6 +89,13 @@ STOP_CAP = "cap"            # max_events o presupuesto de bytes agotado
 STOP_DEADLINE = "deadline"  # presupuesto wall-clock agotado (stream silencioso)
 STOP_TERMINAL = "terminal"  # se vio el evento run.completed
 STOP_DRAINED = "drained"    # el iterador de líneas se agotó (upstream cerró el stream)
+# El evento siguiente supera el techo absoluto por evento (MAX_SINGLE_EVENT_BYTES): la página
+# se cierra SIN emitirlo y SIN avanzar el cursor (fail-loud, ver docstring de
+# MAX_SINGLE_EVENT_BYTES). Los metadatos del evento quedan en SseBatcher.oversized para que el
+# servidor los traduzca a un sobre de error desnudo. Es una parada "para esta página", NO
+# terminal del run: la terminalidad real (si el oversized era run.completed) se recupera con
+# get_run.
+STOP_OVERSIZE = "oversize"
 
 
 def _error_envelope(message: str, code: str, type_: str = "upstream_error") -> dict[str, Any]:
@@ -168,13 +190,18 @@ class SseBatcher:
     bajo el 1 MiB del transporte incluso para ese único evento + overhead del sobre MCP.
 
     Techo ABSOLUTO por evento (fija review Finding "single SSE event has no absolute size
-    limit"): la anti-starvation anterior no acotaba el tamaño de ESE único evento, así que un
-    evento no confiable (p. ej. ``tool.completed.preview``/``text``) podía superar el límite
-    ~1 MiB del transporte. Si el JSON de un evento supera ``max_single_event_bytes``, NO se
-    emite verbatim (truncar un evento opaco violaría el pass-through); se emite en su lugar un
-    PLACEHOLDER estructurado y cursor-safe (``_oversized_event``) que conserva ``event``/
-    ``run_id``/``timestamp``/``seq`` y añade ``vulnerator_mcp_oversized`` con el tamaño y una
-    marca de truncado SIN el payload, avanzando el cursor para no atascar la paginación.
+    limit" y los blocking de la revisión 4): la anti-starvation anterior no acotaba el tamaño
+    de ESE único evento, así que un evento no confiable (p. ej. ``tool.completed.preview``/
+    ``text``) podía superar el límite ~1 MiB del transporte. Si el JSON de un evento supera
+    ``max_single_event_bytes`` se aplica el contrato FAIL-LOUD (ver docstring de
+    ``MAX_SINGLE_EVENT_BYTES``): NO se emite (ni verbatim —truncar un evento opaco violaría el
+    pass-through— ni como placeholder dentro de ``events``, que descartaría el payload y
+    avanzaría el cursor), NO se avanza ``next_cursor`` (el ``seq`` queda recuperable) y se
+    señala ``STOP_OVERSIZE`` guardando los metadatos del evento en :attr:`oversized`
+    (``event``/``run_id``/``timestamp``/``seq`` + tamaño/límite, SIN el payload). El servidor
+    traduce eso a un sobre de error DESNUDO fuera de ``events``. Si la página YA tiene eventos
+    normales, se cierra ANTES con ``STOP_CAP`` (se entregan completos) y el sobredimensionado
+    se reprocesa en la siguiente página vacía.
     """
 
     def __init__(
@@ -191,6 +218,10 @@ class SseBatcher:
         self._max_single = max_single_event_bytes
         self.events: list[dict[str, Any]] = []
         self.next_cursor = after_seq
+        # Metadatos del evento que gatilló STOP_OVERSIZE (None salvo que un evento supere el
+        # techo absoluto y la página esté vacía). NO contiene el payload no confiable: solo
+        # ``event``/``run_id``/``timestamp``/``seq`` + ``serialized_bytes``/``limit_bytes``.
+        self.oversized: Optional[dict[str, Any]] = None
         self._bytes_seen = 0
         self._data_parts: list[str] = []
 
@@ -214,30 +245,23 @@ class SseBatcher:
         return event
 
     @staticmethod
-    def _oversized_event(event: dict[str, Any], size: int, limit: int) -> dict[str, Any]:
-        """Placeholder cursor-safe para un evento que supera el techo absoluto por evento.
+    def _oversized_metadata(event: dict[str, Any], size: int, limit: int) -> dict[str, Any]:
+        """Metadatos (SIN payload) del evento que supera el techo absoluto por evento.
 
-        No se trunca el payload opaco (violaría el pass-through); se construye un dict NUEVO
-        que conserva los metadatos de wire (``event``/``run_id``/``timestamp``/``seq``) y marca
-        el truncado bajo ``vulnerator_mcp_oversized`` con el tamaño y el límite, SIN reenviar
-        el contenido no confiable. El ``seq`` se preserva para que el cursor avance y la
-        paginación no se quede atascada en este evento.
+        NO reenvía el contenido no confiable (``preview``/``text``/``delta``/``output`` ni
+        campos futuros): solo los metadatos de wire (``event``/``run_id``/``timestamp``/
+        ``seq``) y el tamaño/límite. El servidor los pone en un sobre de error DESNUDO fuera de
+        ``events``. El ``seq`` NO avanza el cursor del batch: el evento queda recuperable (el
+        operador puede inspeccionarlo o avanzar manualmente el cursor por encima de él).
         """
-        placeholder: dict[str, Any] = {
-            "vulnerator_mcp_oversized": {
-                "message": (
-                    "event dropped: serialized size %d bytes exceeds the per-event "
-                    "ceiling of %d bytes (payload withheld to stay under the transport "
-                    "message limit)" % (size, limit)
-                ),
-                "serialized_bytes": size,
-                "limit_bytes": limit,
-            }
+        meta: dict[str, Any] = {
+            "serialized_bytes": size,
+            "limit_bytes": limit,
         }
         for key in ("event", "run_id", "timestamp", "seq"):
             if key in event:
-                placeholder[key] = event[key]
-        return placeholder
+                meta[key] = event[key]
+        return meta
 
     def _emit(self, event: dict[str, Any]) -> Optional[str]:
         """Intenta añadir ``event`` a la página. Devuelve una razón de parada o None.
@@ -247,26 +271,30 @@ class SseBatcher:
         batch). Un único evento oversized con la página vacía SÍ se añade (anti-starvation),
         y entonces se cierra la página tras él.
 
-        Techo ABSOLUTO (fija review Finding "single SSE event has no absolute size limit"): si
-        el JSON del evento supera ``max_single_event_bytes``, NO se emite verbatim; se emite en
-        su lugar el placeholder cursor-safe de ``_oversized_event`` (que es pequeño y conserva
-        el ``seq``), y se cierra la página con ``STOP_CAP``. Así un único evento no confiable
-        nunca puede exceder el límite del transporte.
+        Techo ABSOLUTO — contrato FAIL-LOUD (fija review Finding "single SSE event has no
+        absolute size limit" y los blocking de la revisión 4): si el JSON del evento supera
+        ``max_single_event_bytes`` NO se emite —ni verbatim (truncar un evento opaco violaría
+        el pass-through) ni como placeholder dentro de ``events`` (descartaría el payload y
+        avanzaría el cursor)—. Si la página YA tiene eventos normales se cierra ANTES con
+        ``STOP_CAP`` (se entregan completos y el oversized se reprocesa en la siguiente página
+        vacía). Con la página vacía: NO se añade nada a ``events``, NO se avanza ``next_cursor``
+        (el ``seq`` queda recuperable), se guardan los metadatos en :attr:`oversized` y se
+        devuelve ``STOP_OVERSIZE``. El servidor lo traduce a un sobre de error desnudo fuera de
+        ``events``. Así un único evento no confiable nunca excede el límite del transporte y la
+        terminalidad real (si el oversized era ``run.completed``) se recupera con ``get_run``,
+        nunca se devuelve un marcador terminal con semántica no terminal.
         """
         size = len(json.dumps(event))
         if size > self._max_single:
-            # El evento supera el techo absoluto: nunca se reenvía verbatim. Si la página YA
-            # tiene eventos, se cierra ANTES para no mezclar (el oversized se reprocesa en la
-            # siguiente página con la página vacía).
+            # El evento supera el techo absoluto: nunca se emite dentro de `events`. Si la
+            # página YA tiene eventos, se cierra ANTES para entregarlos completos (el oversized
+            # se reprocesa en la siguiente página vacía).
             if self.events:
                 return STOP_CAP
-            placeholder = self._oversized_event(event, size, self._max_single)
-            self.events.append(placeholder)
-            seq = placeholder.get("seq")
-            if isinstance(seq, int) and not isinstance(seq, bool) and seq > self.next_cursor:
-                self.next_cursor = seq
-            self._bytes_seen += len(json.dumps(placeholder))
-            return STOP_CAP  # cierra la página tras el placeholder (avanza el cursor)
+            # Página vacía: fail-loud. Se guardan los metadatos SIN payload y SIN avanzar el
+            # cursor (el seq queda recuperable); el servidor devuelve un sobre de error desnudo.
+            self.oversized = self._oversized_metadata(event, size, self._max_single)
+            return STOP_OVERSIZE
         if self.events and self._bytes_seen + size > self._byte_budget:
             return STOP_CAP  # cerrar ANTES de cruzar el tope; el evento no se incluye
         self.events.append(event)
@@ -320,13 +348,15 @@ def batch_sse_events(
     max_events: Optional[int] = None,
     byte_budget: int = DEFAULT_BYTE_BUDGET,
     max_single_event_bytes: int = MAX_SINGLE_EVENT_BYTES,
-) -> tuple[list[dict[str, Any]], int, str]:
+) -> tuple[list[dict[str, Any]], int, str, Optional[dict[str, Any]]]:
     """Batchea un ITERABLE de líneas en UNA página (helper puro para tests + ruta de error).
 
     Envuelve :class:`SseBatcher`: alimenta las líneas hasta que el batcher señala parada
-    (``STOP_CAP``/``STOP_TERMINAL``) o se agota el iterable (``STOP_DRAINED``). Devuelve
-    ``(events, next_cursor, stop_reason)``. El corte por DEADLINE (stream silencioso) lo
-    gestiona ``iter_events`` con cancelación async, no este helper síncrono.
+    (``STOP_CAP``/``STOP_TERMINAL``/``STOP_OVERSIZE``) o se agota el iterable
+    (``STOP_DRAINED``). Devuelve ``(events, next_cursor, stop_reason, oversized)`` donde
+    ``oversized`` es ``None`` salvo que ``stop_reason`` sea ``STOP_OVERSIZE`` (entonces lleva
+    los metadatos SIN payload del evento sobredimensionado). El corte por DEADLINE (stream
+    silencioso) lo gestiona ``iter_events`` con cancelación async, no este helper síncrono.
     """
     batcher = SseBatcher(
         after_seq=after_seq,
@@ -337,11 +367,11 @@ def batch_sse_events(
     for raw_line in lines:
         reason = batcher.feed(raw_line)
         if reason is not None:
-            return batcher.events, batcher.next_cursor, reason
+            return batcher.events, batcher.next_cursor, reason, batcher.oversized
     reason = batcher.flush()
     if reason is not None:
-        return batcher.events, batcher.next_cursor, reason
-    return batcher.events, batcher.next_cursor, STOP_DRAINED
+        return batcher.events, batcher.next_cursor, reason, batcher.oversized
+    return batcher.events, batcher.next_cursor, STOP_DRAINED, batcher.oversized
 
 
 class HermesApiClient:
@@ -554,10 +584,21 @@ class HermesApiClient:
         else:
             effective_wait = DEFAULT_WAIT_SECONDS
 
-        batcher = SseBatcher(after_seq=after_seq, max_events=max_events)
+        # max_single_event_bytes se lee del módulo en tiempo de LLAMADA (no del default del
+        # __init__, que se liga al definir): así el techo es configurable/testeable.
+        batcher = SseBatcher(
+            after_seq=after_seq,
+            max_events=max_events,
+            max_single_event_bytes=MAX_SINGLE_EVENT_BYTES,
+        )
         cap_reason: Optional[str] = None  # STOP_CAP/STOP_TERMINAL si un tope cerró la página
         hit_deadline = False
         http_error: Optional[dict[str, Any]] = None  # sobre {"error":...} de un non-2xx
+        # Status de un non-2xx YA observado (cabeceras recibidas) ANTES de drenar su cuerpo. Se
+        # guarda aparte para que, si el DRENAJE del cuerpo de error se pasa del deadline (fija
+        # review NB "stalled error body downgrades to a deadline page"), se pueda recuperar la
+        # clasificación de error en vez de degradar a una página de deadline vacía.
+        pending_error_status: Optional[int] = None
 
         try:
             # Read-timeout de httpx = None: el corte REAL por tiempo lo hace
@@ -579,6 +620,10 @@ class HermesApiClient:
                 async with httpx.AsyncClient(timeout=stream_timeout) as client:
                     async with client.stream("GET", url, headers=headers) as resp:
                         if not resp.is_success:
+                            # Se registra el status ANTES de drenar: si el drenaje se pasa del
+                            # deadline, se recupera la clasificación de error tras el scope (NB
+                            # "stalled error body downgrades to a deadline page").
+                            pending_error_status = resp.status_code
                             # Drena el cuerpo de error DENTRO del mismo deadline (un cuerpo que
                             # no cierra no puede mantener la llamada abierta más allá de él).
                             await resp.aread()
@@ -602,6 +647,48 @@ class HermesApiClient:
         if http_error is not None:
             # non-2xx con cabeceras ya recibidas dentro del deadline: sobre de error completo.
             return [], after_seq, http_error, "error"
+        if pending_error_status is not None:
+            # Se observó un non-2xx (cabeceras recibidas) pero el DRENAJE de su cuerpo se pasó
+            # del deadline (http_error quedó sin asignar y cancelled_caught ganaría). Antes esto
+            # degradaba a una página de deadline vacía (done=false), invitando a un cliente
+            # loop-until-done a reintentar el mismo non-2xx (NB "stalled error body downgrades
+            # to a deadline page"). Se preserva la clasificación de error devolviendo el sobre
+            # DESNUDO a partir del status ya conocido (sin cuerpo, porque el cuerpo se colgó),
+            # terminal para la paginación como cualquier otro non-2xx.
+            self._warn(
+                "cuerpo de error upstream HTTP %s se pasó del deadline en %s; se reporta el "
+                "status sin cuerpo" % (pending_error_status, url)
+            )
+            error = _error_envelope(
+                "upstream HTTP %s (error body stalled past the %.3gs stream deadline; body "
+                "withheld)" % (pending_error_status, effective_wait),
+                code="upstream_error",
+            )
+            return [], after_seq, error, "error"
+        if cap_reason == STOP_OVERSIZE:
+            # Un evento SOBREDIMENSIONADO (sobre página vacía) cerró el batch: contrato
+            # FAIL-LOUD. NO se devuelve el evento (ni placeholder), NO se avanza el cursor
+            # (next_cursor sigue en after_seq -> recuperable) y se emite un sobre de error
+            # DESNUDO con los metadatos SIN payload. El servidor lo reenvía desnudo (terminal
+            # para la paginación), igual que un run_not_found pre-evento. La terminalidad real
+            # (si el oversized era run.completed) se recupera con get_run_status.
+            meta = batcher.oversized or {}
+            seq = meta.get("seq")
+            etype = meta.get("event")
+            error = _error_envelope(
+                "a single SSE event (seq=%s, type=%s) serialized to %s bytes, exceeding the "
+                "per-event ceiling of %s bytes; it was NOT forwarded (payload withheld to stay "
+                "under the transport message limit) and the cursor was NOT advanced. Fetch the "
+                "run with get_run_status to recover terminal state, or advance 'cursor' past "
+                "seq=%s to skip it." % (
+                    seq, etype, meta.get("serialized_bytes"), meta.get("limit_bytes"), seq,
+                ),
+                code="oversized_event",
+                type_="oversized_event",
+            )
+            # Se adjuntan los metadatos (SIN payload) para que el cliente los inspeccione.
+            error["error"]["oversized_event"] = meta
+            return [], after_seq, error, "error"
         if cap_reason is not None:
             # Un tope (max_events/byte_budget) o el evento terminal cerró la página.
             return batcher.events, batcher.next_cursor, None, cap_reason

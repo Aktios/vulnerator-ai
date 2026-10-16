@@ -142,6 +142,27 @@ def test_stream_terminal_confirm_offloads_get_run(fake_client):
     assert getrun_calls[0][2] != loop_thread["main"]  # corrió fuera del event loop
 
 
+def test_stream_oversized_event_returns_bare_envelope_terminal_for_paging(fake_client):
+    # Fija los blocking de la revisión 4 a NIVEL de tool: un evento SOBREDIMENSIONADO que
+    # iter_events señala como sobre de error con events=[] se devuelve DESNUDO (NO la forma de
+    # batch), terminal para la paginación. Así nunca aparece un run.completed con done:false ni
+    # se pierde el payload silenciosamente dentro de events.
+    oversized_env = {"error": {
+        "message": "a single SSE event (seq=9, type=run.completed) ... exceeded the ceiling",
+        "type": "oversized_event", "param": None, "code": "oversized_event",
+        "oversized_event": {"seq": 9, "event": "run.completed",
+                            "serialized_bytes": 999_999, "limit_bytes": 524_288},
+    }}
+    # El cliente NO avanza el cursor (next_cursor == after_seq) y marca stop_reason "error".
+    fake_client.iter_result = ([], 0, oversized_env, "error")
+    out = anyio.run(lambda: srv.stream_run_events("run_x", 0))
+    assert out == oversized_env            # sobre DESNUDO verbatim
+    assert "done" not in out and "events" not in out  # NO es la forma de batch
+    assert out["error"]["code"] == "oversized_event"
+    # El cliente NO confirma terminalidad a partir de un error pre-evento.
+    assert not [c for c in fake_client.calls if c[0] == "get_run"]
+
+
 def test_stream_cap_batch_is_not_done_and_skips_confirm(fake_client):
     # Un batch cortado por tope (STOP_CAP) nunca confirma ni declara done.
     events = [{"event": "message.delta", "seq": 1, "run_id": "run_x"}]

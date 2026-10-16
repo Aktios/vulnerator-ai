@@ -49,7 +49,7 @@ def _lines(raw: str):
 
 def test_parser_basic_wire_and_cursor():
     raw = ": open\n\n" + _sse_message(1) + _sse_message(2) + _sse_message(3)
-    events, next_cursor, reason = hac.batch_sse_events(_lines(raw))
+    events, next_cursor, reason, _ = hac.batch_sse_events(_lines(raw))
     assert [e["seq"] for e in events] == [1, 2, 3]
     assert next_cursor == 3
     assert reason == hac.STOP_DRAINED  # el iterador se agotó sin evento terminal
@@ -66,13 +66,13 @@ def test_parser_multiline_data():
     dumped = json.dumps(payload, indent=2)  # multilínea, válido
     data_lines = "".join("data: %s\n" % ln for ln in dumped.split("\n"))
     raw = "id: 5\n" + data_lines + "\n"
-    events, _, _ = hac.batch_sse_events(_lines(raw))
+    events, _, _, _ = hac.batch_sse_events(_lines(raw))
     assert len(events) == 1 and events[0]["seq"] == 5 and events[0]["text"] == "a"
 
 
 def test_parser_dedup_by_after_seq():
     raw = _sse_message(1) + _sse_message(2) + _sse_message(3)
-    events, next_cursor, _ = hac.batch_sse_events(_lines(raw), after_seq=2)
+    events, next_cursor, _, _ = hac.batch_sse_events(_lines(raw), after_seq=2)
     assert [e["seq"] for e in events] == [3]
     assert next_cursor == 3
 
@@ -82,13 +82,13 @@ def test_parser_skips_malformed_and_missing_seq():
     bad_json = "id: 2\ndata: {not json}\n\n"
     no_seq = "id: 3\ndata: %s\n\n" % json.dumps({"event": "x", "run_id": "r"})
     good2 = _sse_message(4)
-    events, _, _ = hac.batch_sse_events(_lines(good + bad_json + no_seq + good2))
+    events, _, _, _ = hac.batch_sse_events(_lines(good + bad_json + no_seq + good2))
     assert [e["seq"] for e in events] == [1, 4]
 
 
 def test_parser_stops_on_terminal_event():
     raw = _sse_message(1) + _sse_message(2, event=hac.TERMINAL_EVENT) + _sse_message(3)
-    events, next_cursor, reason = hac.batch_sse_events(_lines(raw))
+    events, next_cursor, reason, _ = hac.batch_sse_events(_lines(raw))
     # Se para TRAS emitir el evento terminal; el seq 3 no se entrega.
     assert [e["seq"] for e in events] == [1, 2]
     assert events[-1]["event"] == hac.TERMINAL_EVENT
@@ -98,7 +98,7 @@ def test_parser_stops_on_terminal_event():
 
 def test_parser_max_events_cap():
     raw = "".join(_sse_message(i) for i in range(1, 11))
-    events, next_cursor, reason = hac.batch_sse_events(_lines(raw), max_events=3)
+    events, next_cursor, reason, _ = hac.batch_sse_events(_lines(raw), max_events=3)
     assert [e["seq"] for e in events] == [1, 2, 3]
     assert reason == hac.STOP_CAP  # cap -> hay más datos, el servidor NO declara done
     assert next_cursor == 3
@@ -107,7 +107,7 @@ def test_parser_max_events_cap():
 def test_parser_byte_budget_cap_single_event():
     # Un presupuesto de bytes diminuto deja pasar UN único evento (anti-starvation) y corta.
     raw = "".join(_sse_message(i, text="x" * 50) for i in range(1, 6))
-    events, _, reason = hac.batch_sse_events(_lines(raw), byte_budget=10)
+    events, _, reason, _ = hac.batch_sse_events(_lines(raw), byte_budget=10)
     assert len(events) == 1 and events[0]["seq"] == 1
     assert reason == hac.STOP_CAP
 
@@ -122,7 +122,7 @@ def test_parser_byte_budget_closes_page_before_overshoot():
     size_one = len(json.dumps(json.loads(one.split("data: ", 1)[1].split("\n\n")[0])))
     # Presupuesto: cabe el primero, pero el primero+segundo lo cruza.
     budget = size_one + 10
-    events, next_cursor, reason = hac.batch_sse_events(
+    events, next_cursor, reason, _ = hac.batch_sse_events(
         _lines(one + two), byte_budget=budget
     )
     assert [e["seq"] for e in events] == [1]  # el segundo NO se incluyó (sin overshoot)
@@ -134,7 +134,7 @@ def test_parser_byte_budget_two_small_events_both_fit():
     # Control: si ambos caben, los dos salen (no se corta de más).
     one = _sse_message(1, text="a")
     two = _sse_message(2, text="b")
-    events, _, reason = hac.batch_sse_events(_lines(one + two), byte_budget=10_000)
+    events, _, reason, _ = hac.batch_sse_events(_lines(one + two), byte_budget=10_000)
     assert [e["seq"] for e in events] == [1, 2]
     assert reason == hac.STOP_DRAINED
 
@@ -142,51 +142,71 @@ def test_parser_byte_budget_two_small_events_both_fit():
 # ------------------------------------------------------------------ techo absoluto por evento
 
 
-def test_parser_oversized_single_event_is_placeholdered():
-    # Fija el blocking Finding "single SSE event has no absolute size limit": un ÚNICO evento
-    # cuyo JSON supera el techo absoluto NO se emite verbatim (su payload no confiable podría
-    # exceder el límite ~1 MiB del transporte). Se emite un placeholder cursor-safe pequeño que
-    # conserva los metadatos de wire + un marcador de truncado, SIN el payload.
+def test_parser_oversized_single_event_fails_loud_without_consuming_cursor():
+    # Fija los blocking Findings de la revisión 4 ("oversized event placeholder breaks opaque
+    # verbatim pass-through"): un ÚNICO evento cuyo JSON supera el techo absoluto NO se emite
+    # —ni verbatim ni como placeholder dentro de `events`—. La página sale VACÍA, el cursor NO
+    # avanza (el seq queda recuperable) y se señala STOP_OVERSIZE con los metadatos SIN payload
+    # en batcher.oversized.
     huge = "Z" * 5_000
     raw = _sse_message(7, event="tool.completed", preview=huge)
-    events, next_cursor, reason = hac.batch_sse_events(
+    events, next_cursor, reason, oversized = hac.batch_sse_events(
         _lines(raw), max_single_event_bytes=1_000
     )
-    assert len(events) == 1
-    ev = events[0]
-    # El payload no confiable NO se reenvía.
-    assert "preview" not in ev
-    assert huge not in json.dumps(ev)
-    # El placeholder es PEQUEÑO (muy por debajo del techo) y marca el truncado.
-    assert len(json.dumps(ev)) < 1_000
-    assert ev["vulnerator_mcp_oversized"]["serialized_bytes"] > 1_000
-    assert ev["vulnerator_mcp_oversized"]["limit_bytes"] == 1_000
-    # Metadatos de wire preservados -> el cursor AVANZA (no se atasca la paginación).
-    assert ev["event"] == "tool.completed"
-    assert ev["seq"] == 7
-    assert next_cursor == 7
-    assert reason == hac.STOP_CAP
+    # NADA se emite dentro de events: el payload no confiable nunca viaja ni como placeholder.
+    assert events == []
+    # El cursor NO avanza: el seq del oversized queda recuperable (no se consume).
+    assert next_cursor == 0
+    assert reason == hac.STOP_OVERSIZE
+    # Los metadatos (SIN payload) describen el evento sobredimensionado.
+    assert oversized is not None
+    assert oversized["seq"] == 7
+    assert oversized["event"] == "tool.completed"
+    assert oversized["serialized_bytes"] > 1_000
+    assert oversized["limit_bytes"] == 1_000
+    assert huge not in json.dumps(oversized)  # el payload nunca se reenvía
 
 
 def test_parser_oversized_event_after_normal_closes_page_first():
     # Si la página YA tiene un evento normal, el oversized NO se mezcla: se cierra la página
-    # ANTES (STOP_CAP) y su seq NO avanza, para reprocesarlo con la página vacía (y entonces
-    # placeholderearlo). Así nunca se pierde ni se mezcla con eventos normales.
+    # ANTES (STOP_CAP) y su seq NO avanza, para reprocesarlo con la página vacía. Así los
+    # eventos sub-techo se entregan COMPLETOS antes de fallar en el oversized.
     small = _sse_message(1, text="ok")
     huge = _sse_message(2, event="tool.completed", preview="Q" * 5_000)
-    events, next_cursor, reason = hac.batch_sse_events(
+    events, next_cursor, reason, oversized = hac.batch_sse_events(
         _lines(small + huge), max_single_event_bytes=1_000
     )
-    assert [e["seq"] for e in events] == [1]  # solo el normal
+    assert [e["seq"] for e in events] == [1]  # solo el normal, COMPLETO
+    assert events[0]["text"] == "ok"  # el evento sub-techo no se recorta
     assert next_cursor == 1  # el oversized queda pendiente (se reprocesa la próxima página)
     assert reason == hac.STOP_CAP
-    # Página siguiente (empezando tras el seq 1): el oversized se placeholderea.
-    events2, next_cursor2, reason2 = hac.batch_sse_events(
+    assert oversized is None  # aún no se gatilló el fallo-loud (página no vacía)
+    # Página siguiente (empezando tras el seq 1): el oversized falla loud con STOP_OVERSIZE.
+    events2, next_cursor2, reason2, oversized2 = hac.batch_sse_events(
         _lines(huge), after_seq=1, max_single_event_bytes=1_000
     )
-    assert len(events2) == 1
-    assert "vulnerator_mcp_oversized" in events2[0]
-    assert events2[0]["seq"] == 2 and next_cursor2 == 2
+    assert events2 == []
+    assert next_cursor2 == 1  # el cursor sigue SIN avanzar
+    assert reason2 == hac.STOP_OVERSIZE
+    assert oversized2 is not None and oversized2["seq"] == 2
+
+
+def test_parser_oversized_terminal_run_completed_does_not_consume_cursor():
+    # Fija el segundo blocking de la revisión 4 ("oversized terminal run.completed can return
+    # done:false"): si el evento sobredimensionado ES run.completed, NO se devuelve como un
+    # marcador terminal dentro de events (que combinado con STOP_OVERSIZE daría done:false).
+    # Sale VACÍO, STOP_OVERSIZE, cursor sin avanzar; la terminalidad real se recupera luego con
+    # get_run (ver test_iter_events_oversized_* y el server).
+    huge_terminal = _sse_message(9, event=hac.TERMINAL_EVENT, output="X" * 5_000)
+    events, next_cursor, reason, oversized = hac.batch_sse_events(
+        _lines(huge_terminal), max_single_event_bytes=1_000
+    )
+    assert events == []  # NO se devuelve el run.completed como evento no terminal
+    assert next_cursor == 0  # cursor no consumido
+    assert reason == hac.STOP_OVERSIZE
+    assert oversized is not None
+    assert oversized["event"] == hac.TERMINAL_EVENT
+    assert oversized["seq"] == 9
 
 
 # ------------------------------------------------------------------ HermesApiClient
@@ -488,3 +508,62 @@ def test_iter_events_invalid_run_id_no_network(monkeypatch):
     assert reason == "error"
     assert error["error"]["code"] == "invalid_request"
     assert called["n"] == 0
+
+
+def test_iter_events_oversized_single_event_bare_error(monkeypatch):
+    # iter_events con un ÚNICO evento sobredimensionado sobre página vacía: aquí se fuerza el
+    # techo bajo monkeypatcheando MAX_SINGLE_EVENT_BYTES (iter_events no lo expone por firma).
+    monkeypatch.setattr(hac, "MAX_SINGLE_EVENT_BYTES", 1_000)
+    huge = _sse_message(5, event=hac.TERMINAL_EVENT, output="Q" * 5_000)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=huge,
+                              headers={"content-type": "text/event-stream"})
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, next_cursor, error, reason = anyio.run(
+        lambda: client.iter_events("run_x", after_seq=0)
+    )
+    # Sobre DESNUDO: sin eventos, cursor NO avanzado, code oversized_event con metadatos.
+    assert events == []
+    assert next_cursor == 0
+    assert reason == "error"
+    assert error["error"]["code"] == "oversized_event"
+    md = error["error"]["oversized_event"]
+    assert md["seq"] == 5 and md["event"] == hac.TERMINAL_EVENT
+    assert "Q" * 5_000 not in json.dumps(error)  # el payload nunca viaja
+
+
+class _StallingAsyncStream(httpx.AsyncByteStream):
+    """Cuerpo de respuesta async que ENTREGA las cabeceras pero cuelga el cuerpo.
+
+    Permite simular un non-2xx cuyo CUERPO no cierra: `__aiter__` duerme más que el deadline
+    antes de producir nada, de modo que `resp.aread()` se cuelga y el deadline wall-clock lo
+    corta (fija el NB "stalled error body downgrades to a deadline page").
+    """
+
+    async def __aiter__(self):
+        await anyio.sleep(5.0)  # el cuerpo se cuelga más allá del deadline
+        yield b"{}"
+
+
+def test_iter_events_stalled_error_body_preserves_status(monkeypatch):
+    # Fija el NB "stalled error body downgrades to a deadline page": un non-2xx cuyas CABECERAS
+    # llegan pero cuyo CUERPO se cuelga más allá del deadline debe reportarse como un sobre de
+    # error (status conocido), NO como una página de deadline vacía (done:false) que un cliente
+    # loop-until-done reintentaría.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, stream=_StallingAsyncStream(),
+                              headers={"content-type": "application/json"})
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, next_cursor, error, reason = anyio.run(
+        lambda: client.iter_events("run_x", after_seq=0, wait_seconds=0.2)
+    )
+    assert events == []
+    assert reason == "error"  # NO STOP_DEADLINE
+    assert error is not None
+    assert error["error"]["code"] == "upstream_error"
+    assert "503" in error["error"]["message"]

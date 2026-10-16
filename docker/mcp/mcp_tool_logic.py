@@ -124,8 +124,9 @@ def decide_stream_done(
 
       - Si se vio un evento ``run.completed`` en el batch -> ``done=True`` (caso 1).
       - Si el stream se DRENÓ sin evento terminal, se hace UNA confirmación ``get_run``:
-          * si falló (sobre de error) -> ``done=False`` y se adjunta ``terminality_error``
-            (el cliente sigue paginando; el error NO se traga). (caso 2 / revisión-3 F5)
+          * si falló (sobre de error) -> ``done=False`` y el servidor adjunta el sobre
+            COMPLETO ``confirm_run`` (``{"error": {...}}``) bajo ``terminality_error`` (el
+            cliente sigue paginando; el error NO se traga). (caso 2 / revisión-3 F5)
           * si no, ``done = is_terminal_run(confirm_run)``.
       - Si el batch cerró por un TOPE (cap/deadline) y NO drenó -> ``done=False`` SIN confirmar
         (fija el blocking Finding de opus: nunca declarar done con eventos pendientes tras el
@@ -140,8 +141,9 @@ def decide_stream_done(
 
     Returns:
         ``(done, needs_terminality_error)``: ``done`` es el booleano final; si
-        ``needs_terminality_error`` es True el servidor debe adjuntar ``confirm_run["error"]``
-        bajo ``terminality_error``.
+        ``needs_terminality_error`` es True el servidor debe adjuntar el sobre COMPLETO
+        ``confirm_run`` (``{"error": {...}}``, no solo su interior) bajo ``terminality_error``,
+        para que tenga la MISMA forma que ``stream_error`` y el resto de errores de la API.
     """
     if saw_terminal_event:
         return True, False
