@@ -10,4 +10,5 @@ taglines are the project's visual identity.
 | [`vulnerator-ai-wallpaper-desktop.jpeg`](vulnerator-ai-wallpaper-desktop.jpeg) | JPEG | 1264×843 (landscape) | Desktop / PC wallpaper. |
 | [`vulnerator-ai-wallpaper-mobile.jpeg`](vulnerator-ai-wallpaper-mobile.jpeg) | JPEG | 768×1376 (portrait) | Smartphone wallpaper. |
 
-The in-README header logo lives separately at [`../docs/vulnerator-ai-logo.png`](../docs/vulnerator-ai-logo.png).
+The README header uses the desktop wallpaper above. The standalone logo (black background,
+no scene) also lives at [`../docs/vulnerator-ai-logo.png`](../docs/vulnerator-ai-logo.png).

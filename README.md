@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/vulnerator-ai-logo.png" alt="VULNERATOR AI — official logo: spiky death-metal lettering on a black background with a cyberpunk circuit brain and PCB traces, framed by the taglines 'Unholy Pentest', 'offerings to the Kali' and 'summoned from the depths of the OODA abyss · mmxxvi'." width="720">
+  <img src="media/vulnerator-ai-wallpaper-desktop.jpeg" alt="VULNERATOR AI — cyberpunk key art: a hacker astronaut floating in orbit around a 'DATA HAVEN' station amid drifting servers and circuit boards, with the death-metal 'Vulnerator AI' logo and the taglines 'Unholy Pentest', 'offerings to the Kali' and 'summoned from the depths of the OODA abyss · mmxxvi'." width="880">
 </p>
 
 OODA pentest driven by **Hermes** talking **directly** to a **Kali** container via MCP.
