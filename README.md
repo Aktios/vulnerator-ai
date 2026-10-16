@@ -2,6 +2,39 @@
   <img src="media/vulnerator-ai-wallpaper-desktop.jpeg" alt="VULNERATOR AI — cyberpunk key art: a hacker astronaut floating in orbit around a 'DATA HAVEN' station amid drifting servers and circuit boards, with the death-metal 'Vulnerator AI' logo and the taglines 'Unholy Pentest', 'offerings to the Kali' and 'summoned from the depths of the OODA abyss · mmxxvi'." width="880">
 </p>
 
+<p align="center">
+  <a href="https://github.com/irraz/vulnerator-ai/releases/latest">
+    <img src="https://img.shields.io/github/v/release/irraz/vulnerator-ai?style=for-the-badge&label=version&color=b03a3a&labelColor=0a0a0a" alt="Latest release">
+  </a>
+</p>
+
+<p align="center">
+  <sub><b>Built with</b></sub>
+</p>
+
+<p align="center">
+  <a href="https://www.docker.com/">
+    <img src="https://img.shields.io/badge/Docker-containers-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker containers">
+  </a>
+  &nbsp;
+  <a href="https://hermes-agent.nousresearch.com/">
+    <img src="https://img.shields.io/badge/Hermes%20Agent-Nous%20Research-7A5CFF?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=&logoColor=white" alt="Hermes Agent — Nous Research">
+  </a>
+  &nbsp;
+  <a href="https://www.kali.org/">
+    <img src="https://img.shields.io/badge/Kali%20Linux-pentest%20runtime-557C94?style=for-the-badge&logo=kalilinux&logoColor=white" alt="Kali Linux">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    Containerized with <a href="https://www.docker.com/">Docker</a> &middot;
+    driven by <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> from
+    <a href="https://nousresearch.com/">Nous Research</a> &middot;
+    tooling on <a href="https://www.kali.org/">Kali Linux</a>
+  </sub>
+</p>
+
 OODA pentest driven by **Hermes** talking **directly** to a **Kali** container via MCP.
 
 ## What it is
@@ -419,33 +452,4 @@ full catalog). Death-metal / cyberpunk identity — use it for wallpapers, stick
 
 <p align="center">
   <sub>transparent logo (stickers / shirts) &middot; desktop wallpaper &middot; smartphone wallpaper</sub>
-</p>
-
----
-
-<p align="center">
-  <sub><b>Built with</b></sub>
-</p>
-
-<p align="center">
-  <a href="https://www.docker.com/">
-    <img src="https://img.shields.io/badge/Docker-containers-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker containers">
-  </a>
-  &nbsp;
-  <a href="https://hermes-agent.nousresearch.com/">
-    <img src="https://img.shields.io/badge/Hermes%20Agent-Nous%20Research-7A5CFF?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=&logoColor=white" alt="Hermes Agent — Nous Research">
-  </a>
-  &nbsp;
-  <a href="https://www.kali.org/">
-    <img src="https://img.shields.io/badge/Kali%20Linux-pentest%20runtime-557C94?style=for-the-badge&logo=kalilinux&logoColor=white" alt="Kali Linux">
-  </a>
-</p>
-
-<p align="center">
-  <sub>
-    Containerized with <a href="https://www.docker.com/">Docker</a> &middot;
-    driven by <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> from
-    <a href="https://nousresearch.com/">Nous Research</a> &middot;
-    tooling on <a href="https://www.kali.org/">Kali Linux</a>
-  </sub>
 </p>
