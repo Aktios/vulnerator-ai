@@ -27,6 +27,11 @@ model:
   # variable de entorno OPENROUTER_MODEL (ver docker-compose.yml / .env.example): si OPENROUTER_MODEL
   # esta definida y no vacia, el arranque hace `hermes config set model.default <valor>`; si esta
   # vacia o sin definir, se usa este valor tal cual.
+  # INFERENCIA LOCAL/REMOTA (opcional): si se define OLLAMA_BASE_URL en el .env, el arranque
+  # selecciona un endpoint Ollama (OpenAI-compatible) en tiempo de ejecucion via
+  # `hermes config set model.provider custom` + `model.base_url <OLLAMA_BASE_URL>` +
+  # `model.default <OLLAMA_MODEL>`, y Hermes usa Ollama en vez de OpenRouter. Si OLLAMA_BASE_URL
+  # esta vacia/sin definir, el fallback es OpenRouter + este model.default (sin cambios).
   default: "mistralai/mistral-large-4-0"
 
 # --- Primer servidor MCP: la Kali (contenedor `kali`) -----------------------

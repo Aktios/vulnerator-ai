@@ -69,6 +69,36 @@ change them. Once your `.env` is ready:
 docker compose up -d --build
 ```
 
+### Local inference with Ollama (optional)
+
+By default Hermes reasons with Mistral Large on OpenRouter. If you prefer to run the model
+yourself, you can point Hermes at an [Ollama](https://ollama.com) endpoint (OpenAI-compatible)
+instead. This is **opt-in** and fully controlled from the `.env`:
+
+| Variable | Required | Where to put it / how to get it |
+| --- | --- | --- |
+| `OLLAMA_BASE_URL` | No | Empty = use OpenRouter (default). Set it to an Ollama OpenAI-compatible endpoint to use Ollama instead: `http://host.docker.internal:11434/v1` for a local host Ollama, or `http://<host>:11434/v1` for a remote one. When set, `OPENROUTER_API_KEY` is **not** required. |
+| `OLLAMA_MODEL` | No | The Ollama model name used in Ollama mode, e.g. `qwen2.5-coder:32b`. |
+
+At startup the stack branches on `OLLAMA_BASE_URL`: when it is empty the OpenRouter path is used
+exactly as before (and a missing `OPENROUTER_API_KEY` still aborts startup); when it is set, the
+startup script runs `hermes config set model.provider custom`, `model.base_url <OLLAMA_BASE_URL>`
+and `model.default <OLLAMA_MODEL>`, so Hermes talks to Ollama.
+
+Caveats before you rely on it:
+
+- **Context window (hard blocker):** Hermes refuses to start against an endpoint serving less than
+  ~64K tokens of context, and Ollama defaults to as low as 4K. Raise it **server-side** where Ollama
+  runs with `OLLAMA_CONTEXT_LENGTH=64000` (it cannot be raised through the API).
+- **Networking:** make Ollama listen on all interfaces (`OLLAMA_HOST=0.0.0.0`) so the container can
+  reach it. On Linux, reaching a host-run Ollama relies on the
+  `extra_hosts: ["host.docker.internal:host-gateway"]` mapping already set on `ooda-agent` (Docker
+  Desktop on macOS/Windows resolves `host.docker.internal` automatically).
+- **Model suitability (experimental):** every pentest action routes through MCP, so the model must do
+  reliable tool/function-calling and must not refuse the authorized-offensive pentest framing. Parity
+  with Mistral-Large-on-OpenRouter is **not guaranteed** — treat local inference as experimental and
+  validate your chosen model before relying on it.
+
 ## How to drive the pentest (interactive TUI)
 
 ```sh

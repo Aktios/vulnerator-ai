@@ -89,11 +89,36 @@ services:
         cp -r /opt/profile-src/skills/. "$$DEF/skills/" 2>/dev/null || true
         # (b) inject the API server KEY (secret, not versioned) BEFORE starting.
         hermes config set platforms.api_server.key "$$HERMES_API_SERVER_KEY" >/dev/null
-        # (b2) OPTIONAL model override: if OPENROUTER_MODEL is set and non-empty, override
-        # model.default at runtime. If empty/unset, do nothing so the profile's model.default
-        # (mistralai/mistral-large-4-0) is used as-is (fallback).
-        if [ -n "$$OPENROUTER_MODEL" ]; then
-          hermes config set model.default "$$OPENROUTER_MODEL" >/dev/null
+        # (b2) LLM PROVIDER SELECTION (opt-in, fallback = OpenRouter):
+        if [ -n "$$OLLAMA_BASE_URL" ]; then
+          # --- Ollama mode -------------------------------------------------------
+          # OLLAMA_BASE_URL is set => point Hermes at a local/remote Ollama endpoint
+          # (OpenAI-compatible). OPENROUTER_API_KEY is NOT required in this branch.
+          # Hermes reaches the endpoint via the generic OpenAI-compatible "custom"
+          # provider: provider=custom + model.base_url (confirmed key names against the
+          # nousresearch/hermes-agent image: `hermes config set model.provider|base_url|default`).
+          hermes config set model.provider custom >/dev/null
+          hermes config set model.base_url "$$OLLAMA_BASE_URL" >/dev/null
+          # Ollama model name (only if provided; otherwise the profile default is kept,
+          # though for Ollama you normally want an Ollama-served model name here).
+          if [ -n "$$OLLAMA_MODEL" ]; then
+            hermes config set model.default "$$OLLAMA_MODEL" >/dev/null
+          fi
+        else
+          # --- OpenRouter mode (default, OLLAMA_BASE_URL empty) ------------------
+          # Preserve EXACTLY today's v1.0.1 behavior. The compose var no longer uses the
+          # fail-closed `:?` form (so Ollama mode can boot without a key), so re-create the
+          # fail-closed guarantee here: a missing OPENROUTER_API_KEY aborts with non-zero exit.
+          if [ -z "$$OPENROUTER_API_KEY" ]; then
+            echo "ERROR: OPENROUTER_API_KEY is empty. Set it in .env (OpenRouter mode) or set OLLAMA_BASE_URL to use Ollama instead." >&2
+            exit 1
+          fi
+          # OPTIONAL model override: if OPENROUTER_MODEL is set and non-empty, override
+          # model.default at runtime. If empty/unset, do nothing so the profile's model.default
+          # (mistralai/mistral-large-4-0) is used as-is (fallback).
+          if [ -n "$$OPENROUTER_MODEL" ]; then
+            hermes config set model.default "$$OPENROUTER_MODEL" >/dev/null
+          fi
         fi
         # (c) start the default profile gateway: foreground (live container) + API server.
         exec hermes gateway run
@@ -104,13 +129,23 @@ services:
       HERMES_API_SERVER_KEY: "${HERMES_API_SERVER_KEY:?Falta HERMES_API_SERVER_KEY - genera uno con 'openssl rand -hex 32' (min 8 chars) y ponlo en .env}"
       API_SERVER_KEY: "${HERMES_API_SERVER_KEY}"
       # API key for Hermes' LLM provider. Hermes reads the LLM key from THIS env var
-      # (OPENROUTER_API_KEY), which is why HERMES_LLM_API_KEY is NOT declared. Required
-      # fail-closed: without it the agent cannot reason.
-      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:?Falta OPENROUTER_API_KEY - define la API key de OpenRouter en .env}"
+      # (OPENROUTER_API_KEY), which is why HERMES_LLM_API_KEY is NOT declared. NO LONGER
+      # fail-closed at the compose level (`:-` default), so the stack can boot in Ollama mode
+      # without an OpenRouter key. The fail-closed guarantee is re-created IN the startup script:
+      # when OLLAMA_BASE_URL is empty (OpenRouter mode) an empty OPENROUTER_API_KEY aborts startup.
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
       # OPTIONAL OpenRouter model override (NOT fail-closed): empty default. When set and
       # non-empty, the startup command runs 'hermes config set model.default' to override the
       # profile's model.default; when empty/unset, the profile default is used (fallback).
       OPENROUTER_MODEL: "${OPENROUTER_MODEL:-}"
+      # --- Local/remote Ollama inference (OPTIONAL, opt-in) ---
+      # OLLAMA_BASE_URL: empty/unset => use OpenRouter (default, unchanged). Set to an Ollama
+      # OpenAI-compatible endpoint (local http://host.docker.internal:11434/v1, or a remote
+      # http://<host>:11434/v1) to make Hermes use Ollama instead; OPENROUTER_API_KEY is then
+      # not required. The startup script branches on this var.
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-}"
+      # OLLAMA_MODEL: the Ollama model name used when OLLAMA_BASE_URL is set (e.g. qwen2.5-coder:32b).
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-}"
     volumes:
       # NAMED VOLUME REQUIRED (never a bind-mount): Hermes' state.db SQLite in WAL mode
       # GETS CORRUPTED on bind-mounts that cross the macOS VM (virtiofs).
@@ -139,6 +174,12 @@ services:
       # Wait until the browser MCP is healthy before starting.
       playwright-mcp:
         condition: service_healthy
+    # host.docker.internal mapping so a host-run Ollama (OLLAMA_BASE_URL=http://host.docker.internal:11434/v1)
+    # is reachable on LINUX too (Docker Desktop on macOS/Windows resolves it automatically; the explicit
+    # host-gateway mapping is harmless there and makes the Linux host case work out of the box). Only
+    # relevant when using host Ollama; ignored otherwise.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     # Default compose network: reaches kali:8900 and playwright-mcp:8931 via internal DNS.
 
