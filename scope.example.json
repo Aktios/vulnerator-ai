@@ -1,0 +1,21 @@
+{
+  "_comment": "scope.example.json — plantilla del scope-guard OPT-IN. Copia este archivo a scope.json (git-ignored), ajusta allow/deny/ports y pon enabled:true para activarlo. El guard valida el destino de kali_run/kali_exec ANTES de ejecutar: con scope activo, Hermes DEBE declarar 'targets' y todo destino fuera de 'allow' (o en 'deny') se bloquea sin ejecutar. Sin scope.json presente, el comportamiento es el de siempre (sin gate). SCOPE_ENFORCE=0 fuerza desactivar aunque enabled sea true. Las claves que empiezan por '_' son comentarios y el guard las ignora.",
+
+  "enabled": true,
+
+  "_comment_allow": "Destinos permitidos. Cada entrada es {cidr: ...} (IP contra CIDR) o {host: ...} (match LITERAL del hostname; un sufijo NO coincide, no hay resolucion DNS).",
+  "allow": [
+    { "cidr": "10.0.0.0/24" },
+    { "cidr": "192.168.56.0/24" },
+    { "host": "juice-shop" },
+    { "host": "juice-shop.internal" }
+  ],
+
+  "_comment_deny": "Denegaciones EXPLICITAS (tienen PRIORIDAD sobre allow). Util para excluir un host/rango concreto dentro de un allow mas amplio. Elimina/ajusta a tu lab.",
+  "deny": [
+    { "cidr": "10.0.0.1/32" }
+  ],
+
+  "_comment_ports": "OPCIONAL. Si defines 'ports', solo esos puertos se permiten CUANDO el target trae puerto (p. ej. http://juice-shop:3000). Si el target no trae puerto, se permite por host. Si omites 'ports', cualquier puerto de un host permitido vale. Ejemplo: [80, 443, 3000, 8080].",
+  "ports": [80, 443, 3000, 8080]
+}

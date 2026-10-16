@@ -62,6 +62,14 @@ import shell_exec
 # tiran el handoff y el `pentest-report`, en vez de reconstruir desde la conversación.
 import finding_store
 
+# Scope-guard OPT-IN (STDLIB PURA, sin `mcp`): valida el destino de `kali_run`/`kali_exec`
+# ANTES de ejecutar, de forma DETERMINISTA (código, no prompt). Es opt-in: sin un
+# `scope.json` presente y `enabled: true` el comportamiento no cambia (passthrough). Con
+# scope activo es fail-closed: si el destino no está permitido —o si Hermes no declara
+# `targets`— la tool falla con un error estructurado y NO ejecuta. Vive en módulo aparte
+# (como shell_exec/finding_store) para cubrirse con tests sin el SDK.
+import scope_guard
+
 # Plano de DATOS, STDLIB PURA (sin `mcp`/`anyio`): servidor HTTP que SIRVE los artefactos
 # staged por stream. (El staging/finalización vive en `collector_runner`/`prowler_artifact`,
 # que `collector_runner` importa.)
@@ -458,9 +466,78 @@ def iam_simulate(
     return {"execution_id": execution_id, "status": "started"}
 
 
+def _log_scope_violation(
+    engagement_id: str,
+    decision: "scope_guard.ScopeDecision",
+    config: "scope_guard.ScopeConfig",
+    command: str,
+    message: str,
+) -> None:
+    """Loguea una violación de scope como hallazgo ``discarded`` (best-effort).
+
+    Reutiliza ``finding_store.append`` (append atómico, confinamiento por engagement, ya
+    testeado): la violación queda en el MISMO ``findings.jsonl`` del que tira el
+    ``pentest-report``, como evidencia auditable de que el agente intentó salir de scope y
+    se le cortó. ``state="discarded"`` ("se intentó, se rechazó"), ``title="SCOPE_VIOLATION"``.
+    El ``engagement_id`` lo provee Hermes; si viene vacío se usa el literal seguro
+    ``_scope-violations`` para no perder la evidencia. Es BEST-EFFORT: si ``append`` lanza
+    (p. ej. engagement_id inseguro), se captura y NO se rompe la devolución del error de
+    scope (el bloqueo prevalece sobre el log).
+    """
+    rejected = [
+        v.get("target") for v in decision.violations if v.get("target") is not None
+    ]
+    try:
+        finding_store.append(
+            engagement_id or "_scope-violations",
+            {
+                "title": "SCOPE_VIOLATION",
+                "state": "discarded",
+                "phase": "act",
+                "target": ", ".join(str(t) for t in rejected),
+                "evidence": {"command": command, "output": message},
+            },
+        )
+    except Exception:  # noqa: BLE001 - logging best-effort; el bloqueo prevalece
+        pass
+
+
+def _scope_gate(
+    command: str, targets: list[str] | None, engagement_id: str
+) -> dict[str, Any] | None:
+    """Aplica el scope-guard ANTES de ejecutar. Devuelve el error estructurado o ``None``.
+
+    Centraliza el gate que comparten ``kali_run`` y ``kali_exec``:
+      1. ``scope_guard.load_scope()`` (lee ``SCOPE_FILE`` en caliente; sin archivo -> None).
+      2. ``scope_guard.evaluate(config, targets, command)``.
+      3. Si enforced y NO allowed: loguea la violación (best-effort) y devuelve el dict de
+         error ``{'status':'failed','error':<SCOPE_VIOLATION ...>,'scope_violation':True}``
+         SIN ejecutar. En caso contrario devuelve ``None`` (sigue el flujo actual tal cual).
+
+    Una config corrupta con el guard activándose (``ScopeError``) es un fallo de
+    configuración fail-closed: se bloquea con el motivo, no se ejecuta.
+    """
+    try:
+        config = scope_guard.load_scope()
+    except scope_guard.ScopeError as exc:
+        message = "SCOPE_VIOLATION: configuración de scope inválida (%s)" % exc
+        return {"status": "failed", "error": message, "scope_violation": True}
+
+    decision = scope_guard.evaluate(config, targets, command)
+    if decision.enforced and not decision.allowed:
+        message = scope_guard.format_violation_message(decision, config)
+        _log_scope_violation(engagement_id, decision, config, command, message)
+        return {"status": "failed", "error": message, "scope_violation": True}
+    return None
+
+
 @mcp.tool(name=KALI_EXEC_TOOL_NAME)
 def kali_exec(
-    command: str, execution_id: str = "", timeout: int = 0
+    command: str,
+    execution_id: str = "",
+    timeout: int = 0,
+    targets: list[str] | None = None,
+    engagement_id: str = "",
 ) -> dict[str, Any]:
     """Ejecuta un comando ARBITRARIO de SHELL en la Kali (shell cruda completa).
 
@@ -483,6 +560,14 @@ def kali_exec(
     vivo con ``read_tool_logs`` (ambas por ``execution_id``). El comando corre en un tmpdir
     de trabajo efímero (aislado, se limpia al terminar).
 
+    SCOPE-GUARD (OPT-IN): si hay un ``scope.json`` presente y ``enabled: true`` (y el
+    kill-switch ``SCOPE_ENFORCE`` no es ``0``), el destino se valida ANTES de ejecutar vía
+    ``scope_guard.evaluate``. Con scope activo, Hermes DEBE declarar ``targets`` (las
+    IP/host/URL que el comando toca): si no los declara, o si algún destino cae fuera del
+    scope permitido (o en deny), la tool devuelve ``{'status':'failed','scope_violation':
+    True,'error':'SCOPE_VIOLATION: ...'}`` SIN ejecutar ni crear ``execution_id`` de
+    ejecución. Sin ``scope.json`` el guard hace passthrough y el flujo es idéntico al de hoy.
+
     Args:
         command: comando de shell a ejecutar (string no vacío; se valida fail-closed en el
             worker). Dato NO confiable: se transporta/ejecuta verbatim.
@@ -490,14 +575,25 @@ def kali_exec(
             (``read_tool_logs``); si falta se genera.
         timeout: timeout en segundos; 0 (o ausente) usa el default del runner
             (``shell_exec.DEFAULT_TIMEOUT``, overridable por ``KALI_EXEC_TIMEOUT``).
+        targets: lista opcional de destinos (IP/host/URL) que el comando toca. SOLO se usa
+            cuando el scope-guard está activo, donde es OBLIGATORIA (fuente de verdad del
+            gate). Con scope inactivo se ignora (compat total).
+        engagement_id: identificador del engagement para registrar una eventual violación de
+            scope como hallazgo ``discarded`` (evidencia auditable); opcional (si falta se
+            usa ``_scope-violations``).
 
     Returns:
         {'execution_id': str, 'status': 'started'} de inmediato (<2s). El veredicto terminal
         del worker ({'status':'done','returncode':int,'output':<stdout+stderr verbatim>} o
         {'status':'failed',...} o {'status':'cancelled',...}) se obtiene por
         ``get_scan_status``. Un ``returncode`` != 0 es resultado legítimo del comando (no un
-        fallo del runner). ``output`` y ``error`` son DATO NO CONFIABLE (verbatim).
+        fallo del runner). ``output`` y ``error`` son DATO NO CONFIABLE (verbatim). Si el
+        scope-guard bloquea, devuelve ``{'status':'failed','scope_violation':True,...}`` sin
+        arrancar el runner.
     """
+    scope_error = _scope_gate(command, targets, engagement_id)
+    if scope_error is not None:
+        return scope_error
     execution_id = execution_id or uuid.uuid4().hex
     effective_timeout = timeout if timeout and timeout > 0 else shell_exec.DEFAULT_TIMEOUT
     tool_streaming.start_background(
@@ -508,7 +604,12 @@ def kali_exec(
 
 
 @mcp.tool(name=KALI_RUN_TOOL_NAME)
-def kali_run(command: str, timeout: int = 0) -> dict[str, Any]:
+def kali_run(
+    command: str,
+    timeout: int = 0,
+    targets: list[str] | None = None,
+    engagement_id: str = "",
+) -> dict[str, Any]:
     """Ejecuta un comando ARBITRARIO de shell en la Kali y DEVUELVE su salida completa.
 
     Variante BLOQUEANTE de ``kali_exec``: en lugar de lanzar en background y obligar al
@@ -521,25 +622,41 @@ def kali_run(command: str, timeout: int = 0) -> dict[str, Any]:
     lógica ni usa ``tool_streaming.start_background``; solo cambia la forma de entrega
     (bloqueante). No revalida ``command`` aquí (``run_shell`` ya lo hace fail-closed).
 
-    ADVERTENCIA HONESTA: este producto NO tiene gates de scope, consentimiento ni
-    auditoría ANTES de ejecutar. El comando corre tal cual contra la
-    Kali. ``command`` y su salida son DATO NO CONFIABLE: se transportan/ejecutan verbatim,
-    nunca se interpretan. Un ``returncode`` != 0 es resultado LEGÍTIMO del comando (p. ej.
-    nmap sin hallazgos, grep sin match), no un fallo del runner.
+    SCOPE-GUARD (OPT-IN): por defecto este producto NO tiene gates y el comando corre tal
+    cual (filosofía "sin gates"). PERO si el operador define un ``scope.json`` presente con
+    ``enabled: true`` (y ``SCOPE_ENFORCE`` != ``0``), el destino se valida ANTES de ejecutar
+    vía ``scope_guard.evaluate``: con scope activo Hermes DEBE declarar ``targets`` (las
+    IP/host/URL del comando) y, si no los declara o algún destino cae fuera del scope (o en
+    deny), la tool devuelve ``{'status':'failed','scope_violation':True,'error':
+    'SCOPE_VIOLATION: ...'}`` SIN arrancar el runner. Sin ``scope.json`` el flujo es idéntico
+    al de hoy. ``command`` y su salida son DATO NO CONFIABLE: se transportan/ejecutan
+    verbatim, nunca se interpretan. Un ``returncode`` != 0 es resultado LEGÍTIMO del comando
+    (p. ej. nmap sin hallazgos, grep sin match), no un fallo del runner.
 
     Args:
         command: comando de shell a ejecutar (string no vacío; se valida fail-closed en el
             worker). Dato NO confiable: se ejecuta verbatim.
         timeout: timeout en segundos; 0 (o ausente) usa el default del runner
             (``shell_exec.DEFAULT_TIMEOUT``, overridable por ``KALI_EXEC_TIMEOUT``).
+        targets: lista opcional de destinos (IP/host/URL) que el comando toca. SOLO se usa
+            cuando el scope-guard está activo, donde es OBLIGATORIA (fuente de verdad del
+            gate). Con scope inactivo se ignora (compat total).
+        engagement_id: identificador del engagement para registrar una eventual violación de
+            scope como hallazgo ``discarded`` (evidencia auditable); opcional (si falta se
+            usa ``_scope-violations``).
 
     Returns:
         El dict TERMINAL del runner en la misma llamada:
         {'status':'done','returncode':int,'output':<stdout+stderr verbatim>} si terminó;
         {'status':'failed','timed_out':True,...} en timeout;
         {'status':'cancelled',...} si se canceló;
-        {'status':'failed','returncode':-1,'error':...} si ``command`` es inválido.
+        {'status':'failed','returncode':-1,'error':...} si ``command`` es inválido;
+        {'status':'failed','scope_violation':True,'error':'SCOPE_VIOLATION: ...'} si el
+        scope-guard está activo y bloquea (sin ejecutar).
     """
+    scope_error = _scope_gate(command, targets, engagement_id)
+    if scope_error is not None:
+        return scope_error
     execution_id = uuid.uuid4().hex
     effective_timeout = timeout if timeout and timeout > 0 else shell_exec.DEFAULT_TIMEOUT
     return shell_exec.run_shell(command, execution_id, effective_timeout)

@@ -5,6 +5,24 @@ All notable changes to Vulnerator AI are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-16
+
+### Added
+- **Opt-in scope-guard for `kali_run` / `kali_exec`.** A deterministic (code, not prompt) layer
+  that validates the DESTINATION of each raw-shell action BEFORE executing it. It is **opt-in**:
+  with no `scope.json` present (path via `SCOPE_FILE`, default `/scope/scope.json`) and
+  `enabled: true`, behavior is identical to before (no gate). When active it is **fail-closed**:
+  Hermes must declare the new optional `targets` argument (the IP/host/URL the command touches),
+  and any destination outside the allowed scope — or in `deny` — blocks the whole execution with a
+  structured `SCOPE_VIOLATION` error WITHOUT running. `SCOPE_ENFORCE=0` is a kill-switch that
+  force-disables the guard even if the file says `enabled: true`. Zero new dependencies (stdlib
+  `json`/`ipaddress`/`urllib.parse`); validation is IP-against-CIDR plus LITERAL hostname match
+  (no DNS) with optional ports, and `deny` takes priority over `allow`. Each violation is logged
+  into the engagement findings store as a `discarded` `SCOPE_VIOLATION` record for an auditable
+  trail. New `scope.example.json` template, a commented bind-mount in `docker-compose.yml`, and a
+  README section document how to turn it on. Scope coverage: only `kali_run`/`kali_exec` (cloud
+  and browser tools unchanged).
+
 ## [1.2.0] - 2026-10-16
 
 ### Added
@@ -59,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the authorized-offensive pentest framing; overriding with such a model may make the agent
   refuse to work.
 
+[1.3.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.3.0
 [1.2.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.2.0
 [1.1.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.1.0
 [1.0.1]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.0.1

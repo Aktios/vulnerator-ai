@@ -100,3 +100,43 @@ def test_server_text_declares_kali_run_blocking_and_keeps_all_tools():
         "KALI_EXEC_TOOL_NAME",
     ):
         assert name in source
+
+
+def test_server_text_wires_scope_guard_into_runners():
+    # Se valida por TEXTO (NO import: mcp<2 no está en el venv) que el scope-guard quedó
+    # cableado en kali_run/kali_exec con los args nuevos y el gate ANTES de ejecutar.
+    source = _SERVER_PATH.read_text(encoding="utf-8")
+
+    # (1) El servidor importa el módulo del guard (STDLIB puro) y lo invoca.
+    assert "import scope_guard" in source
+    assert "scope_guard.evaluate" in source
+    assert "scope_guard.load_scope" in source
+
+    # (2) Ambos runners aceptan los nuevos args opcionales targets/engagement_id.
+    for runner in ("def kali_run", "def kali_exec"):
+        body_start = source.index(runner)
+        # firma dentro del encabezado de la función (hasta el cierre del paréntesis).
+        header = source[body_start : source.index(")", body_start) + 1]
+        assert "targets" in header
+        assert "engagement_id" in header
+
+    # (3) Ambos runners pasan por el gate ANTES de ejecutar (helper compartido).
+    assert source.count("_scope_gate(command, targets, engagement_id)") == 2
+
+    # (4) kali_run devuelve el error de scope SIN ejecutar: el gate aparece antes de
+    # shell_exec.run_shell en su cuerpo.
+    run_start = source.index("def kali_run")
+    run_body = source[run_start : source.index("def record_finding")]
+    # rindex: la LLAMADA real a run_shell (la última mención; la primera está en el docstring).
+    assert run_body.index("_scope_gate(") < run_body.rindex("shell_exec.run_shell")
+
+    # (5) kali_exec devuelve el error de scope SIN arrancar el background: el gate aparece
+    # antes de start_background en su cuerpo.
+    exec_start = source.index("def kali_exec")
+    exec_body = source[exec_start : source.index("def kali_run")]
+    # rindex: la LLAMADA real a start_background (la última; la primera está en el docstring).
+    assert exec_body.index("_scope_gate(") < exec_body.rindex("tool_streaming.start_background")
+
+    # (6) La violación se loguea en el store de findings (evidencia auditable).
+    assert 'title": "SCOPE_VIOLATION"' in source or '"SCOPE_VIOLATION"' in source
+    assert "finding_store.append" in source

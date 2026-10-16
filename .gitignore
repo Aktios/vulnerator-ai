@@ -9,6 +9,9 @@
 !.env.example
 *.local
 
+# --- Scope-guard: el scope real de un engagement NO se versiona (la plantilla sí) ---
+scope.json
+
 # --- Credenciales AWS que pudieran caer en el árbol de trabajo ---
 .aws/
 credentials

@@ -475,14 +475,75 @@ project's philosophy: there is no gate that blocks, but there is audit disciplin
 evidence so the exploitation can be re-established (and the leakage warning from the auxiliary
 client is kept: redact credentials, `title_generation` off in sensitive engagements).
 
+## Scope-guard (opt-in)
+
+By default the stack has **no gates** (see the warning below): that is the design. But when you run
+against something closer to a real network, you can turn on an **opt-in scope-guard** that validates
+the destination of every `kali_run` / `kali_exec` **before** executing it, deterministically (code,
+not prompt). It lives inside the Kali MCP, in front of the two raw-shell runners. It does **not**
+touch the cloud tools (Prowler/Pacu/IAM) or the browser MCP.
+
+**How it works.** The guard activates **only** if a scope file exists and contains `enabled: true`.
+With no file, behavior is identical to today (no gate). When active it is **fail-closed**: if a
+destination is not allowed — or if Hermes does not declare the targets — the tool fails with a
+structured `SCOPE_VIOLATION` error and does **not** execute.
+
+**Turn it on:**
+
+1. Copy the template and edit it with your lab's allowed destinations:
+
+   ```sh
+   cp scope.example.json scope.json   # scope.json is git-ignored (never versioned)
+   ```
+
+   ```json
+   {
+     "enabled": true,
+     "allow": [
+       { "cidr": "10.0.0.0/24" },
+       { "host": "juice-shop" }
+     ],
+     "deny": [{ "cidr": "10.0.0.1/32" }],
+     "ports": [80, 443, 3000]
+   }
+   ```
+
+   - `allow`: `{cidr}` matches an IP against a CIDR; `{host}` is a **literal** hostname match (no
+     DNS resolution, a suffix does **not** match).
+   - `deny` takes **priority** over `allow`.
+   - `ports` is optional: when set, only those ports are allowed **when the target carries a port**;
+     a target with no port is allowed by host. Omit it to allow any port of an allowed host.
+
+2. Uncomment the bind-mount in `docker-compose.yml` (kali service) so the file lands at
+   `/scope/scope.json` inside the container, then recreate the service:
+
+   ```yaml
+   # volumes:
+   #   - ./scope.json:/scope/scope.json:ro
+   ```
+
+   Create `scope.json` **before** `docker compose up` so Docker mounts a file (not a directory).
+
+**Strict `targets`.** With the scope active, Hermes **must** declare the `targets` argument (the
+IP/host/URL the command touches) on `kali_run`/`kali_exec`. If it does not, the call is blocked
+without executing. A best-effort parse of the command is an extra belt that can only **block** an
+obvious out-of-scope destination, never approve on its own — the declared `targets` are the source
+of truth. Every violation is logged into the engagement findings store as a `discarded`
+`SCOPE_VIOLATION` record, so an attempt to leave scope is auditable in the report.
+
+**Kill-switch.** `SCOPE_ENFORCE=0` force-disables the guard even if the file says `enabled: true`
+(useful to momentarily bypass it without editing the file). Leave it empty to honor the file.
+
 ## ⚠️ Warning (important)
 
-This product **has no guardrails**: **no scope-guard, no consent,
-no audit, no authorization gate**. Hermes runs directly whatever it decides
-against the target, with no gatekeeper to validate the scope.
+By default this product has **no guardrails**: **no scope-guard, no consent, no audit, no
+authorization gate**. Hermes runs directly whatever it decides against the target, with no
+gatekeeper to validate the scope.
 
-This is **intentional**. Use it **only against explicitly authorized targets** and in
-a **controlled environment**. All responsibility for the scope rests with the operator.
+This is **intentional**. The opt-in scope-guard above is the one hard brake you can enable, and even
+then it only gates `kali_run`/`kali_exec` by destination — it is not consent, not a human-approval
+workflow, and not a network firewall. Use this product **only against explicitly authorized targets**
+and in a **controlled environment**. All responsibility for the scope rests with the operator.
 
 ## Media & brand assets
 

@@ -51,6 +51,22 @@ services:
       PROWLER_REGIONS: "${PROWLER_REGIONS-${AWS_REGION:-us-east-1}}"
       PROWLER_SERVICES: "${PROWLER_SERVICES-iam s3}"
       PROWLER_TIMEOUT: "${PROWLER_TIMEOUT:-1800}"
+      # --- Scope-guard (OPT-IN, off by default) ---
+      # The scope-guard validates the DESTINATION of kali_run/kali_exec BEFORE executing,
+      # deterministically (code, not prompt). It activates ONLY if a scope file exists at
+      # SCOPE_FILE and contains `enabled: true` (see the commented volume below and
+      # scope.example.json). Without that file, behavior is IDENTICAL to today (no gate).
+      # SCOPE_FILE: path INSIDE the container where the guard looks for the scope (default
+      # /scope/scope.json). SCOPE_ENFORCE: kill-switch — set to "0" to force-DISABLE the
+      # guard even if the file says enabled:true (leave empty to honor the file).
+      SCOPE_FILE: "${SCOPE_FILE:-/scope/scope.json}"
+      SCOPE_ENFORCE: "${SCOPE_ENFORCE:-}"
+    # Scope-guard mount (OPT-IN): to turn the guard ON, create a `scope.json` at the repo
+    # root (copy scope.example.json), set `enabled: true`, and UNCOMMENT the volume below,
+    # then recreate the kali service. Keep it commented for the default "no gate" behavior.
+    # Create the file BEFORE `docker compose up` so Docker bind-mounts a file (not a dir).
+    # volumes:
+    #   - ./scope.json:/scope/scope.json:ro
     # kali-mcp server port (exposed for direct inspection from the host if
     # needed; ooda-agent reaches it over the internal network as kali:8900). The host
     # port is configurable with KALI_MCP_HOST_PORT (default 8900) without editing this file;
