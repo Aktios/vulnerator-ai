@@ -27,6 +27,9 @@ artifacts/
 findings-*.json
 report-*.md
 *.pcap
+# Excepción: muestra REDACTADA versionada a propósito como documentación (docs/).
+# La IP es la de documentación RFC 5737 (192.0.2.1) y el nº de serie/hostname están redactados.
+!docs/example-findings.jsonl
 
 # --- Estado de perfil de Hermes generado en pruebas ---
 profiles/

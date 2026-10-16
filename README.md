@@ -573,6 +573,16 @@ leaves the report as an artifact on `:8901`. Structure distilled from public tem
 summary, table by status, methodology (OODA/ATT&CK/PTES/OWASP), findings with CVSS 3.1 + CWE and
 reproducible evidence, remediation. CVSS only for confirmed findings.
 
+### Sample report
+
+A real `pentest-report` artifact from an authorized, operator-owned fingerprint engagement is
+included as a sample: [`docs/example-report.md`](docs/example-report.md), with its matching findings
+store [`docs/example-findings.jsonl`](docs/example-findings.jsonl). Both are **redacted** (target IP
+replaced with the RFC 5737 documentation address `192.0.2.1`; device serial and hostname removed) and
+the report is translated to English. They show the end-to-end output: an OODA recon loop driven over
+MCP, each finding recorded with its ATT&CK `technique_id` and verbatim command/output evidence, closed
+by the generated Markdown report.
+
 ## The web flank (browser via MCP)
 
 The **`web-pentest`** skill covers phased web pentesting. It is not limited to `kali_run`: it combines the
