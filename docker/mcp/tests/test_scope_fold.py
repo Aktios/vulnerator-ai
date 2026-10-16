@@ -1,8 +1,11 @@
 """Tests de la lógica PURA del wrapper MCP (`docker/mcp/mcp_tool_logic.py`).
 
 NO importan `mcp`/FastMCP: solo el módulo SDK-free `mcp_tool_logic` + pytest. Cubren el
-formato de scope-folding y la validación de entrada (empty input/scope, clamp de cursor,
-normalización de opcionales), todo lógica pura testeable sin la API viva ni el SDK.
+formato de scope-folding, la validación de entrada (empty input/scope, clamp de cursor,
+normalización de opcionales), la terminalidad por booleanos LITERALES (`is_terminal_run`,
+fija review Finding "truthy terminal") y el contrato de `done` de `stream_run_events`
+(`decide_stream_done`, fija los Findings "done on cap-truncated batches" + "done untested"),
+todo lógica pura testeable sin la API viva ni el SDK.
 """
 
 from __future__ import annotations
@@ -83,3 +86,76 @@ def test_normalize_optional_positive():
     assert mtl.normalize_optional_positive(-1) is None
     assert mtl.normalize_optional_positive(None) is None
     assert mtl.normalize_optional_positive(True) is None
+
+
+# ------------------------------------------------------------------ terminalidad (is_terminal_run)
+
+
+def test_is_terminal_run_requires_literal_true():
+    # Fija el blocking Finding "truthy terminal": SOLO el booleano literal True cuenta.
+    assert mtl.is_terminal_run({"completed": True}) is True
+    assert mtl.is_terminal_run({"interrupted": True}) is True
+    assert mtl.is_terminal_run({"completed": False, "interrupted": True}) is True
+
+
+def test_is_terminal_run_rejects_truthy_non_bool():
+    # Valores "verdaderos" que NO son el booleano True NO son terminales (dato no confiable).
+    assert mtl.is_terminal_run({"completed": "false"}) is False  # string -> NO terminal
+    assert mtl.is_terminal_run({"completed": "true"}) is False
+    assert mtl.is_terminal_run({"completed": 1}) is False
+    assert mtl.is_terminal_run({"completed": [1]}) is False
+    assert mtl.is_terminal_run({"interrupted": "yes"}) is False
+
+
+def test_is_terminal_run_non_terminal_shapes():
+    assert mtl.is_terminal_run({}) is False
+    assert mtl.is_terminal_run({"completed": False, "interrupted": False}) is False
+    assert mtl.is_terminal_run({"status": "cancelled"}) is False  # status NO decide
+    assert mtl.is_terminal_run(None) is False
+    assert mtl.is_terminal_run("completed") is False
+
+
+# ------------------------------------------------------------------ decide_stream_done (done §4.1)
+
+
+def test_done_true_on_terminal_event():
+    done, needs_err = mtl.decide_stream_done(
+        saw_terminal_event=True, stream_drained=False,
+        confirm_run=None, confirm_is_error=False,
+    )
+    assert done is True and needs_err is False
+
+
+def test_done_false_on_cap_without_confirm():
+    # Fija el blocking Finding "done on cap-truncated batches": un batch cortado por tope
+    # (no drenado) NUNCA es done, SIN confirmar get_run (hay cola pendiente tras next_cursor).
+    done, needs_err = mtl.decide_stream_done(
+        saw_terminal_event=False, stream_drained=False,
+        confirm_run={"completed": True},  # aunque el run YA esté terminal upstream...
+        confirm_is_error=False,
+    )
+    assert done is False and needs_err is False  # ...el cap manda: seguir paginando
+
+
+def test_done_from_confirm_on_drain():
+    done, needs_err = mtl.decide_stream_done(
+        saw_terminal_event=False, stream_drained=True,
+        confirm_run={"completed": True}, confirm_is_error=False,
+    )
+    assert done is True and needs_err is False
+
+
+def test_done_false_on_drain_non_terminal_confirm():
+    done, needs_err = mtl.decide_stream_done(
+        saw_terminal_event=False, stream_drained=True,
+        confirm_run={"completed": False, "partial": True}, confirm_is_error=False,
+    )
+    assert done is False and needs_err is False  # partial==true NO es terminal
+
+
+def test_done_false_and_terminality_error_on_confirm_failure():
+    done, needs_err = mtl.decide_stream_done(
+        saw_terminal_event=False, stream_drained=True,
+        confirm_run={"error": {"code": "upstream_unreachable"}}, confirm_is_error=True,
+    )
+    assert done is False and needs_err is True  # error no se traga: terminality_error

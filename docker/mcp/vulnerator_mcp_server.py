@@ -37,19 +37,19 @@ from typing import Any, Optional
 
 # Cliente FINO de :8642 (SDK-free): health/create_run/get_run/steer/stop + stream SSE con
 # cursor por `seq`. Reenvía payloads opacos y mapea errores a sobres estructurados.
-import hermes_api_client
 from hermes_api_client import (
     DEFAULT_MAX_EVENTS,
     DEFAULT_WAIT_SECONDS,
+    STOP_DRAINED,
+    STOP_TERMINAL,
     HermesApiClient,
-    TERMINAL_EVENT,
 )
 
-# Lógica PURA (SDK-free): scope-folding + validación de entrada. Vive aparte para testearse
-# sin importar FastMCP (igual que scope_guard/tool_streaming en Kali).
-import mcp_tool_logic
+# Lógica PURA (SDK-free): scope-folding, validación de entrada y la decisión de `done`.
+# Vive aparte para testearse sin importar FastMCP (igual que scope_guard/tool_streaming en Kali).
 from mcp_tool_logic import (
     clamp_cursor,
+    decide_stream_done,
     fold_scope_into_input,
     normalize_optional_positive,
     validate_run_id,
@@ -90,20 +90,6 @@ mcp = FastMCP(
 
 # Un único cliente a nivel de módulo (stateless; Hermes es dueño del run_id).
 _client = HermesApiClient(HERMES_API_BASE_URL, HERMES_API_SERVER_KEY)
-
-
-# ---------------------------------------------------------------- helpers de terminalidad
-
-
-def _is_terminal_run(run_obj: Any) -> bool:
-    """True si el objeto run indica terminalidad por BOOLEANOS (nunca por el string status).
-
-    Version-tolerancia (§1.1): se mira ``completed``/``interrupted``; ``status``/``partial``
-    se reenvían opacos pero NO se usan para decidir terminalidad.
-    """
-    if not isinstance(run_obj, dict):
-        return False
-    return bool(run_obj.get("completed")) or bool(run_obj.get("interrupted"))
 
 
 # ---------------------------------------------------------------- tools
@@ -204,11 +190,20 @@ async def stream_run_events(
     cruda de herramientas; se transportan verbatim, nunca se interpretan.
 
     ``done`` es True SOLO si (1) se vio un evento ``run.completed`` en este batch, o (2) el
-    stream terminó sin evento terminal Y una llamada confirmatoria ``get_run`` muestra el run
-    terminal por booleanos (``completed`` o ``interrupted``). Si esa confirmación falla con un
-    error, ``done=False`` (el cliente sigue paginando) y el error se adjunta en
-    ``terminality_error`` (no se traga). Un batch que corta por tope (``max_events``,
-    presupuesto de bytes, ``wait_seconds``) devuelve ``done=False``.
+    stream se DRENÓ (upstream cerró la conexión) sin evento terminal Y una confirmación
+    ``get_run`` muestra el run terminal por booleanos LITERALES (``completed is True`` o
+    ``interrupted is True``). Si esa confirmación falla, ``done=False`` (el cliente sigue
+    paginando) y el error se adjunta en ``terminality_error`` (no se traga). Un batch que
+    corta por un TOPE (``max_events``, presupuesto de bytes, o el presupuesto wall-clock
+    ``wait_seconds`` sobre un stream silencioso) devuelve ``done=False`` SIN confirmar: hay
+    eventos pendientes tras ``next_cursor`` y el cliente debe seguir paginando (esto evita el
+    bug de declarar ``done`` dejando la cola —incluido ``output`` y ``run.completed``— sin leer).
+
+    Un FALLO de stream (non-2xx o conexión caída) se devuelve con el sobre ``{"error": {...}}``
+    COMPLETO bajo ``stream_error`` (misma forma que el resto de errores de la API), más los
+    eventos parciales que llegaran antes del fallo. ``wait_seconds`` NO es un error: corta el
+    batch de forma asíncrona (cancelación por deadline) sin esperar al timeout de red ni
+    bloquear el event loop de streamable-http.
 
     Args:
         run_id: id del run (string no vacío).
@@ -219,8 +214,9 @@ async def stream_run_events(
 
     Returns:
         {"events": [...opaco...], "next_cursor": int, "done": bool[, "terminality_error": {...}]},
-        o un sobre de error estructurado ({"error": {...}}) verbatim ante validación/stream
-        fallido.
+        o {"events": [...], "next_cursor": int, "done": false, "stream_error": {"error": {...}}}
+        ante un fallo de stream, o un sobre de error estructurado ({"error": {...}}) verbatim
+        ante validación fallida (p. ej. ``run_id`` inválido).
     """
     err = validate_run_id(run_id)
     if err is not None:
@@ -234,61 +230,63 @@ async def stream_run_events(
     if eff_wait is None:
         eff_wait = DEFAULT_WAIT_SECONDS
 
-    events: list[dict[str, Any]] = []
-    next_cursor = start_cursor
-    saw_terminal = False
-    stream_error: Optional[dict[str, Any]] = None
-
-    for event in _client.iter_events(
+    events, next_cursor, error, stop_reason = await _client.iter_events(
         run_id,
         after_seq=start_cursor,
         max_events=int(eff_max),
         wait_seconds=float(eff_wait),
-    ):
-        # El cliente señala un fallo de conexión/HTTP del stream con un dict {"_error": ...}.
-        if "_error" in event:
-            stream_error = event["_error"]
-            break
-        events.append(event)
-        seq = event.get("seq")
-        if isinstance(seq, int) and not isinstance(seq, bool) and seq > next_cursor:
-            next_cursor = seq
-        # Progreso (solo streamable-http; se guarda con try/except para degradar a batching
-        # puro en stdio o con clientes que no soportan progreso: es cosmético).
-        if ctx is not None:
-            try:
-                await ctx.report_progress(progress=float(len(events)))
-            except Exception:  # noqa: BLE001 - progreso es cosmético; nunca rompe el batch
-                pass
-        if event.get("event") == TERMINAL_EVENT:
-            saw_terminal = True
+    )
 
-    if stream_error is not None:
-        # Fallo del stream (p. ej. Hermes inalcanzable): devuelve lo recogido + el error.
+    # Progreso (solo streamable-http; try/except para degradar a batching puro en stdio o con
+    # clientes sin soporte de progreso: es cosmético y nunca rompe el batch).
+    if ctx is not None and events:
+        try:
+            await ctx.report_progress(progress=float(len(events)))
+        except Exception:  # noqa: BLE001 - progreso es cosmético; nunca rompe el batch
+            pass
+
+    if error is not None:
+        code = error.get("error", {}).get("code") if isinstance(error, dict) else None
+        if code == "invalid_request" and not events:
+            # run_id no es un segmento de path seguro: fail-closed ANTES de tocar la red,
+            # mismo sobre directo que el resto de validaciones (no es un fallo de stream).
+            return error
+        # Fallo del stream (non-2xx o Hermes inalcanzable): se devuelven los eventos parciales
+        # + el sobre {"error": {...}} COMPLETO bajo stream_error (misma forma que el resto de
+        # la API; nunca una forma sintética distinta). done=False -> el cliente puede reintentar.
         return {
             "events": events,
             "next_cursor": next_cursor,
             "done": False,
-            "stream_error": stream_error,
+            "stream_error": error,
         }
+
+    saw_terminal = stop_reason == STOP_TERMINAL
+    stream_drained = stop_reason == STOP_DRAINED
+
+    # Caso 2 (solo en DRENADO real sin evento terminal): una confirmación get_run decide la
+    # terminalidad por booleanos. Un batch cortado por tope/deadline no confirma (done=False).
+    confirm: Any = None
+    confirm_is_error = False
+    if stream_drained and not saw_terminal:
+        confirm = _client.get_run(run_id)
+        confirm_is_error = isinstance(confirm, dict) and isinstance(confirm.get("error"), dict)
+
+    done, needs_terminality_error = decide_stream_done(
+        saw_terminal_event=saw_terminal,
+        stream_drained=stream_drained,
+        confirm_run=confirm,
+        confirm_is_error=confirm_is_error,
+    )
 
     result: dict[str, Any] = {
         "events": events,
         "next_cursor": next_cursor,
-        "done": saw_terminal,
+        "done": done,
     }
-
-    if saw_terminal:
-        return result
-
-    # Caso 2: el stream terminó sin evento terminal. Una confirmación con get_run decide la
-    # terminalidad por booleanos. Si get_run falla, done=False + terminality_error (no se traga).
-    confirm = _client.get_run(run_id)
-    if isinstance(confirm, dict) and isinstance(confirm.get("error"), dict):
+    if needs_terminality_error and isinstance(confirm, dict):
+        # No se traga el error de confirmación: se adjunta su sobre {"error": {...}}.
         result["terminality_error"] = confirm["error"]
-        result["done"] = False
-    else:
-        result["done"] = _is_terminal_run(confirm)
     return result
 
 

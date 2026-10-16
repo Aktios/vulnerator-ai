@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`VULNERATOR_MCP_INBOUND_TOKEN`, `VULNERATOR_MCP_HOST_PORT`), a README section with a
   copy-paste Claude Code / Kiro stdio `mcpServers` snippet and a loud no-guardrails warning,
   and unit tests for the SSE cursor parser and scope-folding/validation logic.
+  `stream_run_events` paging is hardened: a batch cut short by any cap (`max_events`, the
+  ~256 KiB byte budget, or the `wait_seconds` wall-clock budget) returns `done: false` and the
+  confirming `get_run` runs ONLY on a genuine stream drain, so a client looping until `done`
+  never drops the tail of a multi-page terminal run; the byte budget is checked BEFORE adding
+  an event (never overshoots the transport limit by a whole event); the SSE read is async with
+  a deadline-aware cancellation so a quiet upstream ends the batch at `wait_seconds` instead of
+  stalling on the network timeout; terminality requires the literal boolean `True`; a stream
+  failure preserves the full `{"error": {...}}` envelope; and the untrusted `run_id` is encoded
+  as a single path segment (route-traversal rejected before any upstream call).
 
 ## [1.3.0] - 2026-10-16
 

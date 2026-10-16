@@ -1,12 +1,19 @@
-"""Tests del cliente :8642 y el parser SSE (`docker/mcp/hermes_api_client.py`).
+"""Tests del cliente :8642 y el batcher SSE (`docker/mcp/hermes_api_client.py`).
 
-NO importan `mcp`/FastMCP: solo el módulo SDK-free `hermes_api_client` + httpx + pytest
-(mismo patrón que `docker/kali/tests/test_scope_guard.py`). Cubren:
-  - El parser SSE puro: wire `: open`/`id:`/`data:` (incl. multilínea), cursor por `seq`,
-    dedup entre páginas, skip best-effort de eventos malformados, y los topes de batch
-    (max_events, presupuesto de bytes, wait_seconds) + corte en el evento terminal.
+NO importan `mcp`/FastMCP: solo el módulo SDK-free `hermes_api_client` + httpx + anyio +
+pytest (mismo patrón que `docker/kali/tests/test_scope_guard.py`). Cubren:
+  - El batcher SSE puro (`batch_sse_events`): wire `: open`/`id:`/`data:` (incl. multilínea),
+    cursor por `seq`, dedup entre páginas, skip best-effort de eventos malformados, y los
+    topes de batch (max_events, presupuesto de bytes SIN overshoot) + razón de parada
+    (STOP_CAP/STOP_TERMINAL/STOP_DRAINED).
+  - `encode_run_id_segment`: el run_id (dato no confiable) se codifica como UN segmento y se
+    rechaza cualquier intento de recorrido/salto de ruta (fija review Finding "run_id route
+    escape"), incluida la variante percent-encoded; y que un run_id de recorrido NO toca red.
+  - `iter_events` (async, httpx.AsyncClient + MockTransport): stream/dedup, corte en el
+    evento terminal, y preservación del sobre {"error": {...}} COMPLETO en non-2xx/invalid.
   - HermesApiClient con httpx.MockTransport: Bearer puesto, Idempotency-Key solo cuando se
-    da, y el mapeo de cada forma de error (sobre JSON, non-2xx sin sobre, fallo de conexión).
+    da, el mapeo de cada forma de error (sobre JSON, non-2xx sin sobre, fallo de conexión), y
+    que la ruta construida es el target exacto esperado.
 """
 
 from __future__ import annotations
@@ -15,6 +22,7 @@ import json
 import sys
 from pathlib import Path
 
+import anyio
 import httpx
 import pytest
 
@@ -41,8 +49,10 @@ def _lines(raw: str):
 
 def test_parser_basic_wire_and_cursor():
     raw = ": open\n\n" + _sse_message(1) + _sse_message(2) + _sse_message(3)
-    events = list(hac.parse_sse_events(_lines(raw)))
+    events, next_cursor, reason = hac.batch_sse_events(_lines(raw))
     assert [e["seq"] for e in events] == [1, 2, 3]
+    assert next_cursor == 3
+    assert reason == hac.STOP_DRAINED  # el iterador se agotó sin evento terminal
     # Opaco: el dict de evento se entrega sin tocar.
     assert events[0]["event"] == "message.delta"
     assert events[0]["run_id"] == "run_x"
@@ -56,14 +66,15 @@ def test_parser_multiline_data():
     dumped = json.dumps(payload, indent=2)  # multilínea, válido
     data_lines = "".join("data: %s\n" % ln for ln in dumped.split("\n"))
     raw = "id: 5\n" + data_lines + "\n"
-    events = list(hac.parse_sse_events(_lines(raw)))
+    events, _, _ = hac.batch_sse_events(_lines(raw))
     assert len(events) == 1 and events[0]["seq"] == 5 and events[0]["text"] == "a"
 
 
 def test_parser_dedup_by_after_seq():
     raw = _sse_message(1) + _sse_message(2) + _sse_message(3)
-    events = list(hac.parse_sse_events(_lines(raw), after_seq=2))
+    events, next_cursor, _ = hac.batch_sse_events(_lines(raw), after_seq=2)
     assert [e["seq"] for e in events] == [3]
+    assert next_cursor == 3
 
 
 def test_parser_skips_malformed_and_missing_seq():
@@ -71,41 +82,61 @@ def test_parser_skips_malformed_and_missing_seq():
     bad_json = "id: 2\ndata: {not json}\n\n"
     no_seq = "id: 3\ndata: %s\n\n" % json.dumps({"event": "x", "run_id": "r"})
     good2 = _sse_message(4)
-    events = list(hac.parse_sse_events(_lines(good + bad_json + no_seq + good2)))
+    events, _, _ = hac.batch_sse_events(_lines(good + bad_json + no_seq + good2))
     assert [e["seq"] for e in events] == [1, 4]
 
 
 def test_parser_stops_on_terminal_event():
     raw = _sse_message(1) + _sse_message(2, event=hac.TERMINAL_EVENT) + _sse_message(3)
-    events = list(hac.parse_sse_events(_lines(raw)))
+    events, next_cursor, reason = hac.batch_sse_events(_lines(raw))
     # Se para TRAS emitir el evento terminal; el seq 3 no se entrega.
     assert [e["seq"] for e in events] == [1, 2]
     assert events[-1]["event"] == hac.TERMINAL_EVENT
+    assert reason == hac.STOP_TERMINAL
+    assert next_cursor == 2
 
 
 def test_parser_max_events_cap():
     raw = "".join(_sse_message(i) for i in range(1, 11))
-    events = list(hac.parse_sse_events(_lines(raw), max_events=3))
+    events, next_cursor, reason = hac.batch_sse_events(_lines(raw), max_events=3)
     assert [e["seq"] for e in events] == [1, 2, 3]
+    assert reason == hac.STOP_CAP  # cap -> hay más datos, el servidor NO declara done
+    assert next_cursor == 3
 
 
-def test_parser_byte_budget_cap():
-    # Un presupuesto de bytes diminuto corta tras el primer evento.
+def test_parser_byte_budget_cap_single_event():
+    # Un presupuesto de bytes diminuto deja pasar UN único evento (anti-starvation) y corta.
     raw = "".join(_sse_message(i, text="x" * 50) for i in range(1, 6))
-    events = list(hac.parse_sse_events(_lines(raw), byte_budget=10))
+    events, _, reason = hac.batch_sse_events(_lines(raw), byte_budget=10)
     assert len(events) == 1 and events[0]["seq"] == 1
+    assert reason == hac.STOP_CAP
 
 
-def test_parser_wait_seconds_boundary():
-    # Reloj simulado: la deadline se cruza antes de procesar la segunda frontera.
-    ticks = iter([0.0, 0.0, 100.0, 100.0, 100.0, 100.0])
-    raw = _sse_message(1) + _sse_message(2) + _sse_message(3)
-    events = list(hac.parse_sse_events(
-        _lines(raw), wait_seconds=1.0, _clock=lambda: next(ticks)
-    ))
-    # Al menos el primero se emite; el corte por tiempo impide procesar todos.
-    assert events and events[0]["seq"] == 1
-    assert len(events) < 3
+def test_parser_byte_budget_closes_page_before_overshoot():
+    # Fija review Finding "byte budget overshoots by one event": con DOS eventos grandes y un
+    # presupuesto que cabe el primero pero no la suma, el segundo NO se incluye (se mide ANTES
+    # de añadir). El batch devuelve solo el primero y el segundo queda para la próxima página.
+    big = "y" * 200
+    one = _sse_message(1, text=big)
+    two = _sse_message(2, text=big)
+    size_one = len(json.dumps(json.loads(one.split("data: ", 1)[1].split("\n\n")[0])))
+    # Presupuesto: cabe el primero, pero el primero+segundo lo cruza.
+    budget = size_one + 10
+    events, next_cursor, reason = hac.batch_sse_events(
+        _lines(one + two), byte_budget=budget
+    )
+    assert [e["seq"] for e in events] == [1]  # el segundo NO se incluyó (sin overshoot)
+    assert next_cursor == 1  # el seq del segundo NO avanza: se re-leerá en la próxima página
+    assert reason == hac.STOP_CAP
+
+
+def test_parser_byte_budget_two_small_events_both_fit():
+    # Control: si ambos caben, los dos salen (no se corta de más).
+    one = _sse_message(1, text="a")
+    two = _sse_message(2, text="b")
+    events, _, reason = hac.batch_sse_events(_lines(one + two), byte_budget=10_000)
+    assert [e["seq"] for e in events] == [1, 2]
+    assert reason == hac.STOP_DRAINED
 
 
 # ------------------------------------------------------------------ HermesApiClient
@@ -237,3 +268,151 @@ def test_steer_409_forwarded(patch_httpx):
     client = hac.HermesApiClient("http://up:8642", "K")
     out = client.steer_run("run_x", "stop")
     assert out["error"]["code"] == "run_not_accepting_steer"
+
+
+# ------------------------------------------------------------------ run_id como segmento
+
+
+def test_encode_run_id_segment_normal():
+    # Un id normal pasa tal cual (es ya un segmento seguro).
+    assert hac.encode_run_id_segment("run_36998a15") == "run_36998a15"
+
+
+def test_encode_run_id_segment_percent_encodes_specials():
+    # Un espacio u otros caracteres se percent-encodean (siguen siendo UN segmento).
+    assert hac.encode_run_id_segment("run with space") == "run%20with%20space"
+
+
+@pytest.mark.parametrize("evil", [
+    "../runs?ignored",       # el PoC del review: saltaría a POST /v1/runs
+    "../runs",
+    "a/b",                   # slash crudo
+    "a\\b",                  # backslash
+    "run?x=1",               # query
+    "run#frag",              # fragment
+    "%2e%2e%2fruns",         # ".." + "/" percent-encoded -> se decodifica y se rechaza
+    "%2fetc%2fpasswd",       # "/" percent-encoded
+    "run\x00id",             # NUL
+])
+def test_encode_run_id_segment_rejects_route_escape(evil):
+    with pytest.raises(hac.RunIdError):
+        hac.encode_run_id_segment(evil)
+
+
+def test_run_id_route_escape_is_blocked_before_network(patch_httpx):
+    # Fija el blocking Finding "run_id route escape": un run_id de recorrido NO debe tocar la
+    # red; debe devolver invalid_request SIN hacer la petición (no crear un run via steer).
+    called = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        called["n"] += 1
+        return httpx.Response(200, json={"run_id": "run_leak", "status": "started"})
+
+    patch_httpx(handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    out = client.steer_run("../runs?ignored", "please create a run")
+    assert out["error"]["code"] == "invalid_request"
+    assert called["n"] == 0  # NUNCA se llamó a upstream
+
+
+def test_run_id_safe_hits_exact_target(patch_httpx):
+    # "Test the final request target": un run_id normal construye la ruta esperada.
+    targets = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        targets.append(str(request.url))
+        return httpx.Response(200, json={"ok": True})
+
+    patch_httpx(handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    client.get_run("run_abc")
+    client.stop_run("run_abc")
+    assert targets[0] == "http://up:8642/v1/runs/run_abc"
+    assert targets[1] == "http://up:8642/v1/runs/run_abc/stop"
+
+
+# ------------------------------------------------------------------ iter_events (async)
+
+
+def _async_mock_client(hac_module, monkeypatch, handler):
+    """Parchea httpx.AsyncClient para que iter_events use un MockTransport async."""
+    orig_async_client = httpx.AsyncClient
+
+    def _factory(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return orig_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(hac_module.httpx, "AsyncClient", _factory)
+
+
+def test_iter_events_non_2xx_preserves_full_envelope(monkeypatch):
+    # Fija el blocking Finding "streaming errors lose the common error envelope": un run
+    # desconocido en el endpoint de eventos devuelve el sobre {"error": {...}} COMPLETO como
+    # `error`, con stop_reason "error" (misma forma que request/response).
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": {
+            "message": "Run not found: run_x", "type": "invalid_request_error",
+            "param": None, "code": "run_not_found"}})
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, next_cursor, error, reason = anyio.run(
+        lambda: client.iter_events("run_x", after_seq=0)
+    )
+    assert events == [] and next_cursor == 0
+    assert reason == "error"
+    assert error == {"error": {"message": "Run not found: run_x",
+                               "type": "invalid_request_error", "param": None,
+                               "code": "run_not_found"}}
+
+
+def test_iter_events_streams_and_dedup(monkeypatch):
+    body = ": open\n\n" + _sse_message(1) + _sse_message(2) + _sse_message(3)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=body,
+                              headers={"content-type": "text/event-stream"})
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, next_cursor, error, reason = anyio.run(
+        lambda: client.iter_events("run_x", after_seq=1)
+    )
+    assert error is None
+    assert [e["seq"] for e in events] == [2, 3]
+    assert next_cursor == 3
+    assert reason == hac.STOP_DRAINED
+
+
+def test_iter_events_terminal_event_stops(monkeypatch):
+    body = _sse_message(1) + _sse_message(2, event=hac.TERMINAL_EVENT) + _sse_message(3)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=body,
+                              headers={"content-type": "text/event-stream"})
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, _, error, reason = anyio.run(
+        lambda: client.iter_events("run_x", after_seq=0)
+    )
+    assert error is None
+    assert [e["seq"] for e in events] == [1, 2]  # para en el terminal
+    assert reason == hac.STOP_TERMINAL
+
+
+def test_iter_events_invalid_run_id_no_network(monkeypatch):
+    called = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        called["n"] += 1
+        return httpx.Response(200, text="")
+
+    _async_mock_client(hac, monkeypatch, handler)
+    client = hac.HermesApiClient("http://up:8642", "K")
+    events, _, error, reason = anyio.run(
+        lambda: client.iter_events("../runs", after_seq=0)
+    )
+    assert reason == "error"
+    assert error["error"]["code"] == "invalid_request"
+    assert called["n"] == 0
