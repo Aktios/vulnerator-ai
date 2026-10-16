@@ -367,6 +367,29 @@ against the target, with no gatekeeper to validate the scope.
 This is **intentional**. Use it **only against explicitly authorized targets** and in
 a **controlled environment**. All responsibility for the scope rests with the operator.
 
+## Media & brand assets
+
+Official artwork lives in [`media/`](media/) (see [`media/README.md`](media/README.md) for the
+full catalog). Death-metal / cyberpunk identity — use it for wallpapers, stickers and shirts.
+
+<p align="center">
+  <a href="media/vulnerator-ai-logo-transparent.png">
+    <img src="media/vulnerator-ai-logo-transparent.png" alt="Transparent logo (stickers / shirts)" height="150">
+  </a>
+  &nbsp;&nbsp;
+  <a href="media/vulnerator-ai-wallpaper-desktop.jpeg">
+    <img src="media/vulnerator-ai-wallpaper-desktop.jpeg" alt="Desktop wallpaper" height="150">
+  </a>
+  &nbsp;&nbsp;
+  <a href="media/vulnerator-ai-wallpaper-mobile.jpeg">
+    <img src="media/vulnerator-ai-wallpaper-mobile.jpeg" alt="Smartphone wallpaper" height="150">
+  </a>
+</p>
+
+<p align="center">
+  <sub>transparent logo (stickers / shirts) &middot; desktop wallpaper &middot; smartphone wallpaper</sub>
+</p>
+
 ---
 
 <p align="center">
