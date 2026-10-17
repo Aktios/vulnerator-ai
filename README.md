@@ -456,6 +456,21 @@ in [`docs/lyrics.md`](docs/lyrics.md)) — a nod to the project's death-metal ba
   <sub>transparent logo (stickers / shirts) &middot; desktop wallpaper &middot; smartphone wallpaper</sub>
 </p>
 
+## 🤝 Sponsors
+
+We are grateful for the support of companies that believe in advancing cybersecurity
+knowledge and making security insights accessible to the community.
+
+<p align="center">
+  <a href="https://aktios.com/">
+    <img src="https://sjimnar.github.io/assets/images/aktios.avif" alt="Aktios" height="80">
+  </a>
+</p>
+
+**Special thanks to [Aktios](https://aktios.com/):** `vulnerator-ai` was born inside the
+Aktios cybersecurity team, and we extend our sincere gratitude for their continued support.
+Their commitment to cybersecurity made this project possible.
+
 ## License
 
 Released under the [MIT License](LICENSE). You are free to use, modify and distribute this
