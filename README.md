@@ -61,8 +61,7 @@ end to end.
 - **ooda-agent** — Hermes (`nousresearch/hermes-agent`) as the OODA loop driver. It is a client
   of both MCPs (`kali:8900`, `playwright-mcp:8931`) and runs the pentest tools directly.
   It keeps its gateway alive with `hermes gateway run` (OpenAI-compatible API server on `:8642`,
-  **published to the host** by default so you can pilot it from an external assistant — see
-  "Pilot Hermes from an external assistant").
+  **published to the host** by default so you can pilot it — see "Driving a pentest").
 
 - **vulnerator-mcp** — a thin MCP **front door** over Hermes' `:8642` runs API so external MCP
   clients (Claude Code / Kiro, BugTraceAI, ...) can trigger/observe/steer/stop a pentest as MCP
@@ -72,8 +71,8 @@ end to end.
   `VULNERATOR_MCP_INBOUND_TOKEN`. For **local** Claude Code / Kiro the recommended path is instead
   the **stdio** mode (`docker run -i …`, zero network surface, no token). It wraps, does **not**
   replace, the HTTP API: it exposes **only** the runs lifecycle (no raw `kali_run`, no
-  `/v1/chat/completions`) so the client stays a trigger/observer, never the brain. See "Consume
-  Hermes from an MCP client (`vulnerator-mcp`)" below.
+  `/v1/chat/completions`) so the client stays a trigger/observer, never the brain. See "Driving a
+  pentest → From an MCP client" below.
 
 There are no `api` or `ui` services: the agent talks directly to the MCPs (Kali and browser),
 and the MCP front door only forwards the runs lifecycle.
@@ -171,21 +170,87 @@ Caveats before you rely on it:
   with Mistral-Large-on-OpenRouter is **not guaranteed** — treat local inference as experimental and
   validate your chosen model before relying on it.
 
-## How to drive the pentest (interactive TUI)
+## Driving a pentest
+
+Three ways to pilot an engagement, from simplest to most programmatic. All of them drive the same
+OODA loop; pick by how you work.
+
+### 1. Interactive TUI (`hermes chat`)
 
 ```sh
 docker compose up -d --build
 docker compose exec -it ooda-agent hermes chat
 ```
 
-`hermes chat` opens the agent's interactive TUI/REPL. From there you ask it for a pentest
-in natural language; Hermes drives the OODA and runs the tools on Kali
-**directly** with the `kali_run` tool (talking to `kali:8900`).
+`hermes chat` opens the agent's REPL. Ask for a pentest in natural language; Hermes drives the OODA
+and runs tools on Kali directly via `kali_run` (talking to `kali:8900`). The container's command
+`hermes gateway run` also keeps Hermes' API server alive on `:8642`, which powers ways 2 and 3.
 
-`hermes gateway run` (the container's command) keeps the container alive and starts
-Hermes' API server on `:8642`. That API server is an **alternative programmatic** path
-(OpenAI-compatible) and is **published to the host** by default, to pilot Hermes from an
-external assistant without entering the TUI (see the next section).
+### 2. From an MCP client — recommended for assistants
+
+If your tooling speaks **MCP** (Claude Code, Kiro, Cursor, BugTraceAI, …), the stack ships
+**`vulnerator-mcp`** (`docker/mcp/`): a thin MCP server that wraps Hermes' runs API and exposes it
+as MCP tools. It wraps, it does **not** replace, the HTTP API — it exposes **only** the runs
+lifecycle, so the client stays a trigger/observer and never the brain. It never exposes
+`/v1/chat/completions` or any raw `kali_run`.
+
+**Five tools + a health check**, mapped 1:1 onto the runs API:
+
+| Tool | Does |
+| --- | --- |
+| `start_pentest(input, scope, …)` | starts a run; returns `{run_id, status, replayed}` |
+| `get_run_status(run_id)` | the full run object (status + `completed`/`partial`/`interrupted` + output + usage) |
+| `stream_run_events(run_id, cursor, …)` | pages the lifecycle events with a `seq` cursor (`{events, next_cursor, done}`); also emits one MCP progress notification per page over streamable-HTTP |
+| `steer_run(run_id, input)` | injects a correction mid-run; surfaces the `409 run_not_accepting_steer` verbatim |
+| `stop_run(run_id)` | stops the run; returns the full run object |
+| `health()` | upstream health (`{status, platform, version}`) |
+
+Event/status/output payloads are forwarded verbatim as **untrusted data** (never interpreted).
+
+**Local — stdio (recommended for Claude Code / Kiro).** Zero network surface: the client spawns the
+server as a subprocess over stdin/stdout — no listener, no token, no port. Build the image once and
+add an `mcpServers` entry:
+
+```sh
+docker build -f docker/mcp/Dockerfile -t vulnerator-ai-mcp:dev .
+```
+
+```json
+{
+  "mcpServers": {
+    "vulnerator-mcp": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--add-host", "host.docker.internal:host-gateway",
+        "-e", "HERMES_API_SERVER_KEY",
+        "-e", "HERMES_API_BASE_URL=http://host.docker.internal:8642",
+        "vulnerator-ai-mcp:dev"
+      ],
+      "env": { "HERMES_API_SERVER_KEY": "<your HERMES_API_SERVER_KEY>" }
+    }
+  }
+}
+```
+
+The upstream Bearer is a pass-through of `HERMES_API_SERVER_KEY` (no second secret for the hop). On
+Docker Desktop `host.docker.internal` resolves out of the box; on stock Linux the `--add-host`
+above is what makes it resolve (or point `HERMES_API_BASE_URL` at the host's reachable address).
+
+**In-docker / remote — streamable-HTTP (up by default).** The streamable-HTTP service is part of the
+default stack, reachable on the internal network at `http://vulnerator-mcp:8700` (an in-docker
+consumer like a BugTraceAI container reaches it there with no extra steps). It is **fail-closed** on
+`VULNERATOR_MCP_INBOUND_TOKEN` (`docker compose up` aborts without it) and every request must carry
+`Authorization: Bearer <VULNERATOR_MCP_INBOUND_TOKEN>` (the `/healthz` route is the one exception).
+Host publication is **off by default** — set `VULNERATOR_MCP_HOST_PORT` and uncomment the service's
+`ports:` block in `docker-compose.yml` to publish on a controlled machine. See **Security & scope**
+below for the threat model.
+
+### 3. Raw HTTP API (`:8642`)
+
+For CI scripts or plain `curl`, Hermes exposes an OpenAI-compatible API server directly on `:8642`
+(the same endpoints `vulnerator-mcp` wraps). Full reference — access modes, the runs flow,
+`chat/completions`, and the request/response contract — in **[`docs/http-api.md`](docs/http-api.md)**.
 
 ### Quickstart against a lab target (Juice Shop)
 
@@ -215,222 +280,6 @@ docker compose -f docker-compose.yml -f docker-compose.target.yml exec -it ooda-
 
 This is the authorized target for practicing the `web-pentest` skill. Only the web lab is in scope
 here (no AD or other labs for now).
-
-## Pilot Hermes from an external assistant (Kiro / Claude)
-
-Sometimes you don't want to enter the `hermes chat` TUI: you want an assistant (Kiro, Claude, a
-CI script) to **trigger and observe** a pentest over HTTP. Hermes already exposes an
-**OpenAI-compatible** API server (enabled in the profile, `agent-ooda/profile/config.yaml` →
-`platforms.api_server`); all you need is to reach it.
-
-**Role of the external assistant: trigger and observer, not brain.** The one that reasons and runs the
-pentest is Hermes (driven by the `mistralai/mistral-large-4-0` model, chosen on purpose
-because Claude rejects the offensive framing of authorized pentesting). The assistant only sends the
-engagement prompt and reads the events; it must **not** try to "think" the pentest or reinterpret
-the Kali tools.
-
-Authentication: all calls go with `Authorization: Bearer <HERMES_API_SERVER_KEY>`
-(the same key from the `.env`).
-
-### Two access modes
-
-**Mode A — published port (recommended).** The compose publishes `:8642` to the host (configurable
-with `HERMES_API_HOST_PORT`, default `8642`). The assistant calls `http://localhost:8642`
-directly:
-
-```sh
-export KEY=$(grep '^HERMES_API_SERVER_KEY=' .env | cut -d= -f2)
-
-# alive?
-curl -s http://localhost:8642/health          # -> {"status":"ok"}
-```
-
-**Mode B — without opening a port (`exec`).** If you prefer not to publish `:8642` to the host, delete the
-`ports:` block of the `ooda-agent` service and talk to the API from inside the container:
-
-```sh
-docker compose exec ooda-agent \
-  curl -s http://localhost:8642/health
-# If you launched the stack with '-p <project>', pass it here too:
-#   docker compose -p pentest-ana exec ooda-agent curl -s http://localhost:8642/health
-```
-
-All the `curl` calls below are the same in both modes; only the prefix changes (direct host vs.
-`docker compose exec ooda-agent`).
-
-### Main flow (runs API)
-
-The `runs` pattern is designed precisely for this: launch a long job and subscribe to its
-progress instead of handling the streaming by hand.
-
-```sh
-# 1) Launch the pentest. The body carries the engagement in natural language in the "input" field.
-#    It responds {"run_id":"run_abc123","status":"started"}.
-curl -s http://localhost:8642/v1/runs \
-  -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "input": "Authorized pentest against 10.0.0.0/24 (scope: that /24 only). Enumerate, identify exposed services and test access paths. Report confirmed findings with evidence."
-      }'
-
-# 2) Observe progress: SSE stream of lifecycle events (OODA, tool.start/complete, ...).
-curl -N http://localhost:8642/v1/runs/run_abc123/events \
-  -H "Authorization: Bearer $KEY"
-
-# 2b) Or query the point-in-time status (status: started | running | completed | failed | cancelled).
-curl -s http://localhost:8642/v1/runs/run_abc123 \
-  -H "Authorization: Bearer $KEY"
-
-# 3) (Optional) Inject guidance mid-run. Only while status=running; it is delivered at the
-#    next tool boundary. If the run no longer accepts steer, it responds 409.
-curl -s http://localhost:8642/v1/runs/run_abc123/steer \
-  -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"input": "Focus on port 445 first."}'
-
-# 4) (Optional) Interrupt the run.
-curl -s http://localhost:8642/v1/runs/run_abc123/stop \
-  -H "Authorization: Bearer $KEY"
-```
-
-Fields of the `POST /v1/runs` body (verified against Hermes' official docs): `input`
-(string, required) and, optional, `session_id`, `instructions`, `conversation_history`,
-`previous_response_id`. For safe retries you can send the `Idempotency-Key` header.
-
-### Alternative: `POST /v1/chat/completions` (OpenAI-compatible)
-
-If your client already speaks the OpenAI format, you can use the classic endpoint (SSE streaming)
-instead of the runs API:
-
-```sh
-curl -s http://localhost:8642/v1/chat/completions \
-  -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "model": "hermes-agent",
-        "messages": [{"role": "user", "content": "Authorized pentest against 10.0.0.0/24 (scope: that /24 only). Report confirmed findings with evidence."}]
-      }'
-```
-
-### Instructions for the assistant
-
-Pattern a Kiro/Claude should follow to pilot an engagement:
-
-1. `GET /health` to confirm the stack is alive (`{"status":"ok"}`).
-2. `POST /v1/runs` with the engagement in `input` (explicit target and **scope**, in natural
-   language). Save the `run_id` from the response.
-3. Follow the run to a terminal state: read the SSE from `GET /v1/runs/{run_id}/events`, or
-   poll `GET /v1/runs/{run_id}` until `completed` / `failed` / `cancelled`.
-4. Summarize the result to the user (findings, final status). For the formal deliverable, Hermes
-   itself generates the Markdown report via the `pentest-report` skill and leaves it as an artifact in the
-   data channel (`:8901`).
-
-The assistant **does not decide** the tools nor reinterpret the Kali output: that is Hermes' job.
-Its role is to trigger, observe and summarize.
-
-### Security note
-
-Publishing `:8642` to the host **lowers the network barrier** the stack had on purpose (before, the API
-server was only reachable over the internal docker network). From there on, the endpoint's only protection
-is the `HERMES_API_SERVER_KEY` Bearer: use it **only on a controlled machine/environment**, and if you don't
-need external access use Mode B (`exec`, without opening a port). This is consistent with the
-⚠️ Warning further down: there is no scope-guard or authorization gate, responsibility for the
-scope rests entirely with the operator.
-
-## Consume Hermes from an MCP client (`vulnerator-mcp`)
-
-If your tooling speaks **MCP** rather than raw HTTP (Claude Code, Kiro, Cursor, BugTraceAI, …),
-the stack ships a thin MCP server — **`vulnerator-mcp`** (`docker/mcp/`) — that wraps Hermes'
-`:8642` runs API and exposes it as MCP tools. It wraps, it does **not** replace, the HTTP API: it
-exposes **only** the runs lifecycle, so the client stays a trigger/observer and never the brain.
-
-It runs in **two modes**: a **streamable-HTTP** service that is **up by default** with the stack
-(for in-docker consumers like BugTraceAI, and for host-published use), and a **stdio** mode that
-**local** Claude Code / Kiro spawn as a subprocess (recommended locally; zero network surface).
-
-Five tools + a health check, mapped 1:1 onto `:8642`:
-
-| Tool | Does |
-| --- | --- |
-| `start_pentest(input, scope, …)` | starts a run (`POST /v1/runs`); returns `{run_id, status, replayed}` |
-| `get_run_status(run_id)` | the full run object (status + `completed`/`partial`/`interrupted` + output + usage) |
-| `stream_run_events(run_id, cursor, …)` | pages the SSE events with a `seq` cursor (`{events, next_cursor, done}`); also emits one MCP progress notification per page (batch-completion telemetry) over streamable-HTTP |
-| `steer_run(run_id, input)` | injects a correction (`POST …/steer`); surfaces the 409 `run_not_accepting_steer` verbatim |
-| `stop_run(run_id)` | stops the run (`POST …/stop`); returns the full run object |
-| `health()` | upstream `GET /health` (`{status, platform, version}`) |
-
-It deliberately does **not** expose `/v1/chat/completions` or any raw `kali_run` pass-through.
-Event/status/output payloads are forwarded verbatim as **untrusted data** (never interpreted).
-
-> ⚠️ **No guardrails — same warning as the rest of the product, amplified.** The MCP layer
-> enforces **no scope**, no consent and no audit; it only adds *reachability*. The `scope`
-> argument on `start_pentest` is **REQUIRED but ADVISORY**: it is folded into the prompt for
-> operator clarity, it is **not** an enforced constraint. For a real deterministic gate on
-> raw-shell actions, enable the **optional Kali-layer scope-guard** (v1.3.0, via `scope.json` —
-> see "Scope-guard (opt-in)" below); that is a different, opt-in layer and is **not** a gate on
-> this runs API. Responsibility for the scope rests entirely with the operator.
-
-### Local: stdio (recommended for Claude Code / Kiro)
-
-stdio has **zero network surface**: the client spawns the server as a subprocess over
-stdin/stdout — no listener, no inbound token, no port. Build the image once
-(`docker build -f docker/mcp/Dockerfile -t vulnerator-ai-mcp:dev .`), then add an `mcpServers`
-entry (copy-paste; the stdio process reaches the host-published `:8642` via
-`host.docker.internal`, which the `--add-host` below maps to the host gateway):
-
-```json
-{
-  "mcpServers": {
-    "vulnerator-mcp": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "--add-host", "host.docker.internal:host-gateway",
-        "-e", "HERMES_API_SERVER_KEY",
-        "-e", "HERMES_API_BASE_URL=http://host.docker.internal:8642",
-        "vulnerator-ai-mcp:dev"
-      ],
-      "env": { "HERMES_API_SERVER_KEY": "<your HERMES_API_SERVER_KEY>" }
-    }
-  }
-}
-```
-
-> **Linux note.** On Docker Desktop (macOS/Windows) `host.docker.internal` resolves out of the
-> box, so the `--add-host` is optional there; on **stock Linux Docker** it does **not** resolve
-> unless you pass `--add-host=host.docker.internal:host-gateway` (included above). If you prefer,
-> point `HERMES_API_BASE_URL` at the host's reachable address instead (e.g. the Docker bridge
-> gateway or the host IP).
-
-The upstream Bearer is a **pass-through** of `HERMES_API_SERVER_KEY` (no second secret is minted
-for the `:8642` hop).
-
-### In-docker / remote: streamable-HTTP (up by default)
-
-The streamable-HTTP service is part of the **default** stack, so a plain
-
-```sh
-# requires VULNERATOR_MCP_INBOUND_TOKEN in .env (generate: openssl rand -hex 32)
-docker compose up -d --build
-```
-
-brings it up as the 4th container, `vulnerator-mcp`, reachable on the internal network at
-`http://vulnerator-mcp:8700` (upstream Hermes at `http://ooda-agent:8642`). An in-docker consumer
-(e.g. a BugTraceAI container on the same network) reaches it there with no extra steps. Key
-properties:
-
-- **Host publication is OFF by default.** The service declares no `ports:` block (internal
-  network only, like `playwright-mcp`/`juice-shop`), so by default nothing is exposed to the
-  host. To publish on a **controlled** machine, set `VULNERATOR_MCP_HOST_PORT` in `.env` **and**
-  uncomment the `ports:` block of the `vulnerator-mcp` service in `docker-compose.yml`.
-- **Mandatory, fail-closed inbound token.** The default stack refuses to start without
-  `VULNERATOR_MCP_INBOUND_TOKEN` (compose `:?` guard + an in-process guard), and every request
-  must carry `Authorization: Bearer <VULNERATOR_MCP_INBOUND_TOKEN>` (a dedicated `/healthz` route
-  is the one exact-match exception). This token is **separate** from `HERMES_API_SERVER_KEY`.
-- **Threat model (read this).** The inbound token gates only the *clients → vulnerator-mcp* edge.
-  It does **not** re-protect the pre-existing `:8642` host exposure, which stays under its own
-  `HERMES_API_SERVER_KEY` Bearer (see "Security note" above). Publishing the MCP port is an
-  explicit operator choice; until you do, the token guards an internal-network edge.
 
 ## Start clean between exercises
 
@@ -485,190 +334,109 @@ docker compose exec -it ooda-agent hermes chat --continue <new-session-name>
 
 This does not delete the previous memory; it just avoids dragging it into the new conversation.
 
-## The OODA loop: design and comparison
+## How it works
 
-This project's "OODA loop" **is not an engine that runs on its own**: there is no code that iterates nor a
-scheduler. The OODA is **prompt-induced behavior**, split across three pieces of the profile
-(`agent-ooda/`):
+The "OODA loop" is **prompt-induced behavior**, not a scheduler: it is defined across the declarative
+profile (`agent-ooda/` — `SOUL.md`, the `pentest-ooda` skill, and domain skills for network, cloud and
+web). Hermes orients with **MITRE ATT&CK** as the loop's language (tagging each finding with its
+`technique_id`), advances while there is real progress, and hands off when the path is exhausted or
+the goal is confirmed unreachable. Evidence is persisted to a **per-engagement findings store** on the
+artifacts plane (`:8901`) via the `record_finding` / `read_findings` MCP tools, and the
+**`pentest-report`** skill turns that store into the formal Markdown deliverable at close.
 
-- `profile/SOUL.md` — identity of the OODA driver (first block of the system prompt).
-- `skills/pentest-ooda/SKILL.md` — the loop procedure (Observe → Orient → Decide → Act),
-  stop rules and delegation.
-- `skills/ooda-report-handoff/SKILL.md` — format of the summary when closing a cycle.
-
-Domain skills (conditional activation, they only load when the context fits):
-
-- `skills/l3-recon-pivot/` — layer-3 network reconnaissance behind NAT (network/infra).
-- `skills/aws-pacu-privesc/` — offensive AWS pentest with Pacu (cloud/IAM), mapped to ATT&CK Cloud.
-- `skills/web-pentest/` — phased web pentest (recon → analysis → proof-based exploitation),
-  combining `kali_run` (nmap/whatweb/nuclei/ffuf/sqlmap) with a real browser via the `playwright`
-  MCP. Web flank.
-- `skills/attack-navigation/` — MITRE ATT&CK as the **Orient language**: orient by tactics and
-  tag findings with their `technique_id`. Cross-cutting.
-- `skills/pentest-report/` — generates the formal report (Markdown) when closing the engagement, reading the
-  findings store. Loop closure.
-
-The trigger is the operator's message: Hermes enters the OODA role when you hand it an
-engagement, advances autonomously as long as there is **real progress toward the goal**, and stops (handoff) when
-the path is exhausted, after 3 steps without progress, or when it confirms the goal is unreachable.
-
-**ATT&CK as the loop's language:** the control loop is still OODA; ATT&CK does not replace it. It is
-used as a lens in Orient (place the current tactic and the next plausible one — it feeds the "Decide
-with alternatives") and as a taxonomy to tag each finding (`technique_id`), which enables
-reports mapped to ATT&CK. The general detail lives in `attack-navigation` and the Cloud one in
-`aws-pacu-privesc`.
-
-### Comparison with public OODAs (what we learned)
-
-Two public OODA skills/patterns were compared with ours:
-
-- **`neurofoo/agent-skills` (OODA as an analysis framework).** A *thinking* OODA: its "Act"
-  produces a plan, it does not execute. Useful to deliberate; it is a structured report, not a control
-  loop. Idea taken: **Decide with explicit alternatives** (weigh 2-3 paths before choosing one)
-  — already distilled into `pentest-ooda` and `SOUL.md`.
-- **`jomadu/rooda` (OODA as an execution loop).** The closest to ours: it iterates O→O→D→A with
-  **fresh context each round** and `max-iterations`. Idea taken: **fresh context** — in Hermes it is
-  implemented by delegating long branches to subagents (`delegate_task`), which start with clean context
-  and only return their summary. Already distilled into `pentest-ooda` (delegation section) and required
-  re-enabling `delegation` in `config.yaml`.
-
-| Dimension | neurofoo (analysis) | rooda (execution) | **Our `pentest-ooda`** |
-|---|---|---|---|
-| Nature | Decision report | Autonomous code loop | Autonomous pentest loop |
-| "Act" | Plans (does not execute) | Actually executes | Executes on Kali (`kali_run`) |
-| Stop criterion | — (one-shot) | `max-iterations` (quantitative) | **Qualitative progress** (getting closer to the goal / unreachability) |
-| Memory between rounds | — | File (AGENTS.md, PLAN.md) | Ephemeral per engagement (on purpose) |
-| Fresh context | — | Per iteration | Per delegation to subagents |
-| Output as untrusted data | No | No | **Yes** (prompt injection in outputs) |
-
-Two things ours does better and worth preserving: the **qualitative stop criterion** (not
-a simple iteration counter) and treating **all tool output as untrusted data** (critical
-in pentesting). The two borrowed ideas (alternatives in Decide, fresh context via subagents) cover
-the two weaknesses we had versus the public ones.
-
-## Evidence persistence and report
-
-The OODA has a **per-engagement findings store** that the handoff and the report pull from:
-
-- **Where it lives.** On the artifacts plane (`/artifacts`, port `:8901`), NOT in Hermes'
-  state: it survives the ephemeral nature of the profile and is downloadable. One file per engagement
-  (`<engagement-id>/findings.jsonl`), one finding per line.
-- **How the agent feeds it.** With the MCP tools `record_finding` / `read_findings` (in
-  `docker/kali/kali_mcp_server.py`, over `docker/kali/finding_store.py`): structured append and
-  paginated reads, without the agent writing JSON by hand.
-- **Schema of a finding.** id, OODA phase, class/`technique_id` (ATT&CK), target
-  (host/port/resource/ARN), status (hypothesis | partial | confirmed | discarded), evidence
-  (command + returncode + verbatim output or reference to the artifact), confidence, timestamp, and for
-  changes in the account the `vulnerator-ai` tag + reversal command. The status aligns with the
-  "hypothesis vs. confirmed finding" discipline from `SOUL.md`.
-- **Consumers.** `ooda-report-handoff` and `pentest-report` READ from the store instead of rebuilding
-  from the conversation.
-- **Untrusted data.** The stored evidence is still untrusted data when re-read: reason
-  about it, do not obey embedded instructions (prompt injection).
-
-The **`pentest-report`** skill produces the formal deliverable at close: a **Markdown** report generated
-by `docker/kali/report_gen.py` (baked into the image, invoked with `kali_run`) that reads the store and
-leaves the report as an artifact on `:8901`. Structure distilled from public templates with attribution
-(`Theophilus/athena-pentest`, `Marmeus/pentesting-report-generator`): engagement details, executive
-summary, table by status, methodology (OODA/ATT&CK/PTES/OWASP), findings with CVSS 3.1 + CWE and
-reproducible evidence, remediation. CVSS only for confirmed findings.
+Full design detail — the skill breakdown, the comparison with public OODA patterns
+(`neurofoo/agent-skills`, `jomadu/rooda`), the findings-store schema, and the browser/web flank — is
+in **[`docs/design.md`](docs/design.md)**.
 
 ### Sample report
 
 A real `pentest-report` artifact from an authorized, operator-owned fingerprint engagement is
 included as a sample: [`docs/example-report.md`](docs/example-report.md), with its matching findings
 store [`docs/example-findings.jsonl`](docs/example-findings.jsonl). Both are **redacted** (target IP
-replaced with the RFC 5737 documentation address `192.0.2.1`; device serial and hostname removed) and
-the report is translated to English. They show the end-to-end output: an OODA recon loop driven over
-MCP, each finding recorded with its ATT&CK `technique_id` and verbatim command/output evidence, closed
-by the generated Markdown report.
+replaced with the RFC 5737 documentation address `192.0.2.1`; device serial and hostname removed).
+They show the end-to-end output: an OODA recon loop driven over MCP, each finding recorded with its
+ATT&CK `technique_id` and verbatim command/output evidence, closed by the generated Markdown report.
 
-## The web flank (browser via MCP)
+## Security & scope
 
-The **`web-pentest`** skill covers phased web pentesting. It is not limited to `kali_run`: it combines the
-Kali CLI tools (nmap/whatweb/nuclei/ffuf/sqlmap, via `kali_run`) with a **real browser
-via MCP** — the `playwright-mcp` container (headless Chromium, official Microsoft image),
-registered as the second MCP server (`playwright`) in the profile. This preserves the project's
-principle (**everything goes through MCP, zero native toolsets**): Hermes gains `mcp_playwright_*` for
-navigation/DOM/XSS without re-enabling the native `browser` toolset. Its guardrails are aligned with the
-project's philosophy: there is no gate that blocks, but there is audit discipline and reproducible
-evidence so the exploitation can be re-established (and the leakage warning from the auxiliary
-client is kept: redact credentials, `title_generation` off in sensitive engagements).
+> ⚠️ **By default this product has no guardrails: no scope-guard, no consent, no audit, no
+> authorization gate.** Hermes runs directly whatever it decides against the target. This is
+> **intentional.** Use it **only against explicitly authorized targets** and in a **controlled
+> environment**. All responsibility for the scope and for lawful use rests with the operator.
 
-## Scope-guard (opt-in)
+There are two things you *can* turn on, and it helps to know what each does and does **not** cover.
 
-By default the stack has **no gates** (see the warning below): that is the design. But when you run
-against something closer to a real network, you can turn on an **opt-in scope-guard** that validates
-the destination of every `kali_run` / `kali_exec` **before** executing it, deterministically (code,
-not prompt). It lives inside the Kali MCP, in front of the two raw-shell runners. It does **not**
-touch the cloud tools (Prowler/Pacu/IAM) or the browser MCP.
+### The opt-in scope-guard (`kali_run` / `kali_exec`)
 
-**How it works.** The guard activates **only** if a scope file exists and contains `enabled: true`.
-With no file, behavior is identical to today (no gate). When active it is **fail-closed**: if a
-destination is not allowed — or if Hermes does not declare the targets — the tool fails with a
-structured `SCOPE_VIOLATION` error and does **not** execute.
+A deterministic (code, not prompt) gate that validates the destination of every raw-shell action
+**before** executing it. It lives inside the Kali MCP, in front of the two raw-shell runners. It
+does **not** touch the cloud tools (Prowler/Pacu/IAM) or the browser MCP.
 
-**Turn it on:**
+It activates **only** if a scope file exists and contains `enabled: true`; with no file, behavior is
+identical to the default (no gate). When active it is **fail-closed**: a destination that is not
+allowed — or a call where Hermes did not declare its `targets` — fails with a structured
+`SCOPE_VIOLATION` and does not execute. Every violation is logged into the findings store as a
+`discarded` record, so an attempt to leave scope is auditable in the report.
 
-1. Copy the template and edit it with your lab's allowed destinations:
+Turn it on:
+
+1. Copy the template and edit it with your lab's allowed destinations (`scope.json` is git-ignored):
 
    ```sh
-   cp scope.example.json scope.json   # scope.json is git-ignored (never versioned)
+   cp scope.example.json scope.json
    ```
 
    ```json
    {
      "enabled": true,
-     "allow": [
-       { "cidr": "10.0.0.0/24" },
-       { "host": "juice-shop" }
-     ],
+     "allow": [{ "cidr": "10.0.0.0/24" }, { "host": "juice-shop" }],
      "deny": [{ "cidr": "10.0.0.1/32" }],
      "ports": [80, 443, 3000]
    }
    ```
 
    - `allow`: `{cidr}` matches an IP against a CIDR; `{host}` is a **literal** hostname match (no
-     DNS resolution, a suffix does **not** match).
-   - `deny` takes **priority** over `allow`.
-   - `ports` is optional: when set, only those ports are allowed **when the target carries a port**;
-     a target with no port is allowed by host. Omit it to allow any port of an allowed host.
+     DNS, a suffix does not match). `deny` takes **priority** over `allow`. `ports` is optional:
+     when set, only those ports are allowed when the target carries one.
 
 2. Uncomment the bind-mount in `docker-compose.yml` (kali service) so the file lands at
-   `/scope/scope.json` inside the container, then recreate the service:
+   `/scope/scope.json`, then recreate the service. Create `scope.json` **before** `docker compose
+   up` so Docker mounts a file, not a directory.
 
    ```yaml
    # volumes:
    #   - ./scope.json:/scope/scope.json:ro
    ```
 
-   Create `scope.json` **before** `docker compose up` so Docker mounts a file (not a directory).
+   **Strict `targets`:** with the scope active, Hermes **must** declare the `targets` argument (the
+   IP/host/URL the command touches) on `kali_run`/`kali_exec`, or the call is blocked. A best-effort
+   parse of the command is an extra belt that can only **block**, never approve — the declared
+   `targets` are the source of truth.
 
-**Strict `targets`.** With the scope active, Hermes **must** declare the `targets` argument (the
-IP/host/URL the command touches) on `kali_run`/`kali_exec`. If it does not, the call is blocked
-without executing. A best-effort parse of the command is an extra belt that can only **block** an
-obvious out-of-scope destination, never approve on its own — the declared `targets` are the source
-of truth. Every violation is logged into the engagement findings store as a `discarded`
-`SCOPE_VIOLATION` record, so an attempt to leave scope is auditable in the report.
+   **Kill-switch:** `SCOPE_ENFORCE=0` force-disables the guard even if the file says `enabled: true`.
 
-**Kill-switch.** `SCOPE_ENFORCE=0` force-disables the guard even if the file says `enabled: true`
-(useful to momentarily bypass it without editing the file). Leave it empty to honor the file.
+### The MCP inbound token (`vulnerator-mcp` over HTTP)
 
-## ⚠️ Warning (important)
+When the `vulnerator-mcp` streamable-HTTP service is reachable, it is **fail-closed** on
+`VULNERATOR_MCP_INBOUND_TOKEN` and every request must carry it as a Bearer. This gates **only** the
+*client → vulnerator-mcp* edge. It does **not** re-protect the pre-existing `:8642` exposure (that
+stays under its own `HERMES_API_SERVER_KEY` Bearer), and it is **not** a scope-guard — it controls
+*who can reach the trigger*, not *what the engine is allowed to touch*. The local **stdio** mode has
+no listener and needs no token.
 
-By default this product has **no guardrails**: **no scope-guard, no consent, no audit, no
-authorization gate**. Hermes runs directly whatever it decides against the target, with no
-gatekeeper to validate the scope.
+### What none of this is
 
-This is **intentional**. The opt-in scope-guard above is the one hard brake you can enable, and even
-then it only gates `kali_run`/`kali_exec` by destination — it is not consent, not a human-approval
-workflow, and not a network firewall. Use this product **only against explicitly authorized targets**
-and in a **controlled environment**. All responsibility for the scope rests with the operator.
+The scope-guard gates `kali_run`/`kali_exec` by destination; the inbound token gates reachability.
+Neither is consent, a human-approval workflow, or a network firewall. The `scope` argument on the
+MCP `start_pentest` tool is **advisory** (folded into the prompt for operator clarity), not an
+enforced constraint. The hard brake is the opt-in scope-guard above.
 
 ## Media & brand assets
 
 Official artwork lives in [`media/`](media/) (see [`media/README.md`](media/README.md) for the
 full catalog). Death-metal / cyberpunk identity — use it for wallpapers, stickers and shirts.
+There's also a theme song ([`media/vulnerator-ai-song.mp3`](media/vulnerator-ai-song.mp3), lyrics
+in [`docs/lyrics.md`](docs/lyrics.md)) — a nod to the project's death-metal band aesthetic.
 
 <p align="center">
   <a href="media/vulnerator-ai-logo-transparent.png">
