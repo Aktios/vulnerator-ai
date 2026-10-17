@@ -687,3 +687,14 @@ full catalog). Death-metal / cyberpunk identity — use it for wallpapers, stick
 <p align="center">
   <sub>transparent logo (stickers / shirts) &middot; desktop wallpaper &middot; smartphone wallpaper</sub>
 </p>
+
+## License
+
+Released under the [MIT License](LICENSE). You are free to use, modify and distribute this
+software, including commercially, as long as the copyright notice and permission notice are
+preserved. The software is provided "as is", without warranty of any kind.
+
+> **Note on responsible use.** The MIT license governs the *code*, not how you may use it. This is
+> an offensive security tool with **no scope-guard, consent or authorization gate by default** (see
+> the ⚠️ Warning above). Use it **only against explicitly authorized targets**; responsibility for
+> the scope and for lawful use rests entirely with the operator.
