@@ -1,0 +1,770 @@
+/* Vulnerator AI — landing page. Death-metal / cyberpunk, dark minimalist. */
+
+:root {
+  --bg: #0a0a0a;
+  --bg-deep: #080b14;        /* deep space blue-black */
+  --panel: #10131c;          /* metallic grey-blue panel */
+  --panel-edge: #1c2130;
+  --text: #e6e8ec;
+  --muted: #9aa0ac;          /* metallic grey */
+  --accent: #b03a3a;         /* brand dark red (README badge) */
+  --accent-soft: #c75a5a;
+  --magenta: #c25b9a;        /* cold pink/magenta, used sparingly */
+  --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --maxw: 920px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+a { color: var(--accent-soft); }
+a:hover { color: var(--magenta); }
+
+code {
+  font-family: var(--mono);
+  color: var(--accent-soft);
+  background: rgba(176, 58, 58, 0.1);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  padding: 4rem 1.5rem;
+}
+
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero__bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.hero__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse at center, rgba(10, 10, 10, 0.45) 0%, rgba(8, 11, 20, 0.82) 70%, rgba(10, 10, 10, 0.96) 100%),
+    linear-gradient(to bottom, rgba(10, 10, 10, 0.55), rgba(10, 10, 10, 0.75));
+}
+
+.hero__content {
+  position: relative;
+  z-index: 2;
+  max-width: 760px;
+}
+
+.hero__eyebrow {
+  margin: 0 0 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5em;
+  font-size: 0.8rem;
+  color: var(--accent-soft);
+  text-shadow: 0 0 12px rgba(176, 58, 58, 0.5);
+}
+
+.hero__logo {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  margin: 0 auto 1.5rem;
+  display: block;
+  filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.8));
+}
+
+.hero__tagline {
+  margin: 0 0 0.4rem;
+  font-size: 1.3rem;
+  color: var(--text);
+  letter-spacing: 0.08em;
+}
+
+.hero__sub {
+  margin: 0 0 2rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+
+.hero__pitch {
+  margin: 0 auto;
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.hero__pitch strong { color: var(--text); }
+
+/* ---------- Sections ---------- */
+.section {
+  padding: 5.5rem 0;
+  border-top: 1px solid var(--panel-edge);
+}
+
+.section--warn { padding: 4rem 0; }
+
+.section__title {
+  margin: 0 0 1.5rem;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: var(--accent-soft);
+  font-weight: 600;
+}
+
+.section__lead {
+  margin: -0.75rem 0 2rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.prose {
+  max-width: 680px;
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.prose strong { color: var(--text); }
+
+/* ---------- Architecture cards ---------- */
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-top: 2px solid var(--accent);
+  border-radius: 6px;
+  padding: 1.5rem;
+}
+
+.card__name {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  color: var(--text);
+  letter-spacing: 0.05em;
+}
+
+.card__name::before {
+  content: "> ";
+  color: var(--accent);
+}
+
+.card__body {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.card__body code {
+  font-size: 0.85em;
+}
+
+/* ---------- Chips ---------- */
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.chip {
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--text);
+}
+
+/* ---------- Warning ---------- */
+.warning {
+  border: 1px solid var(--accent);
+  background: rgba(176, 58, 58, 0.08);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 1.75rem 2rem;
+}
+
+.warning__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--accent-soft);
+}
+
+.warning__body {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.98rem;
+}
+
+.warning__body strong { color: var(--accent-soft); }
+
+/* ---------- Footer ---------- */
+.footer {
+  padding: 3rem 0 4rem;
+  border-top: 1px solid var(--panel-edge);
+  background: var(--bg-deep);
+}
+
+.footer__wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  text-align: center;
+}
+
+.footer__link {
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+}
+
+.footer__tagline {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+  .hero__eyebrow { letter-spacing: 0.35em; font-size: 0.72rem; }
+  .hero__tagline { font-size: 1.1rem; }
+  .section { padding: 4rem 0; }
+  .section__title { font-size: 1rem; }
+  .prose { font-size: 1rem; }
+}
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ── Boot screen ──────────────────────────────────────────────── */
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* CRT scanlines */
+#boot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 0, 0, 0.14) 2px,
+    rgba(0, 0, 0, 0.14) 4px
+  );
+  pointer-events: none;
+}
+
+/* Vignette */
+#boot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.7) 100%);
+  pointer-events: none;
+}
+
+.boot__inner {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  max-width: 740px;
+  padding: 3rem 2rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.boot__inner::-webkit-scrollbar { display: none; }
+
+/* SVG displacement filter — scale=0 at rest, boot.js drives it during glitches */
+.boot__inner { filter: url(#boot-glitch-filter); }
+
+/* TV static noise canvas (low-res, scaled up = pixelated static) */
+.boot__noise {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges; /* Safari */
+}
+
+/* Boot line base — baseline chromatic aberration always visible */
+.bl {
+  font-family: var(--mono);
+  font-size: 0.83rem;
+  line-height: 1.9;
+  color: #b03a3a;
+  text-shadow:
+    -1px 0 rgba(255, 20, 20, 0.40),
+    1px 0 rgba(20, 60, 255, 0.24),
+    0 0 8px rgba(176, 58, 58, 0.55);
+  white-space: pre;
+}
+
+.bl--sp { line-height: 0.7; } /* empty spacer */
+.bl--d  { color: #3a3a3a; text-shadow: none; }  /* dim — BIOS header */
+.bl--h  {                                         /* hi — system armed */
+  color: #c75a5a;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 18px rgba(199, 90, 90, 0.85);
+}
+
+.bl__ok {
+  color: #5ab870;
+  text-shadow: 0 0 8px rgba(90, 184, 112, 0.5);
+}
+
+/* Standby "PRESS ANY KEY" prompt */
+.standby__prompt {
+  display: block;
+  margin-top: 2.2rem;
+  color: #c75a5a;
+  letter-spacing: 0.24em;
+  animation: bpulse 1.3s ease-in-out infinite;
+  text-shadow: 0 0 14px rgba(199, 90, 90, 0.65);
+}
+
+/* Enter prompt */
+#boot-prompt {
+  display: none;
+  margin: 2.5rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.28em;
+  color: #c75a5a;
+  text-transform: uppercase;
+  animation: bpulse 1.8s ease-in-out infinite;
+  text-shadow: 0 0 14px rgba(199, 90, 90, 0.65);
+}
+
+@keyframes bpulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+
+/* ── Exit: TV-off effect ─────────────────────────────────────── */
+.boot--exit {
+  animation: tvoff 0.9s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+@keyframes tvoff {
+  0%   { clip-path: inset(0 0 0 0);           filter: brightness(1);    }
+  18%  { clip-path: inset(0 0 0 0);           filter: brightness(4);    }
+  42%  { clip-path: inset(44% 0 44% 0);       filter: brightness(2.5);  }
+  62%  { clip-path: inset(49% 0 49% 0);       filter: brightness(6);    }
+  78%  { clip-path: inset(49.7% 0 49.7% 0);   filter: brightness(10);   }
+  100% { clip-path: inset(50% 0 50% 0);       filter: brightness(0); opacity: 0; }
+}
+
+/* ── Glitch tiers ────────────────────────────────────────────── */
+
+/* MINOR: amplified chromatic aberration on all text */
+#boot.boot--chroma .bl {
+  text-shadow:
+    -9px 0 rgba(255, 0, 80, 0.98),
+    9px 0 rgba(0, 80, 255, 0.92),
+    0 0 30px rgba(220, 0, 100, 0.94),
+    0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+#boot.boot--chroma .bl__ok {
+  text-shadow:
+    -7px 0 rgba(255, 80, 0, 0.85),
+    7px 0 rgba(0, 220, 90, 0.75);
+}
+
+/* MAJOR: screen flicker — pure opacity, doesn't conflict with SVG filter */
+#boot.boot--flicker {
+  animation: sflicker 0.24s steps(4) forwards;
+}
+
+@keyframes sflicker {
+  0%   { opacity: 1; }
+  25%  { opacity: 0.12; }
+  50%  { opacity: 0.80; }
+  75%  { opacity: 0.02; }
+  100% { opacity: 1; }
+}
+
+/* MAJOR: horizontal jitter — whole terminal layer jolts sideways */
+#boot.boot--jitter .boot__inner {
+  animation: jitter 0.20s steps(5) forwards;
+}
+
+@keyframes jitter {
+  0%   { transform: translateX(0);    }
+  20%  { transform: translateX(-11px);}
+  40%  { transform: translateX(15px); }
+  60%  { transform: translateX(-8px); }
+  80%  { transform: translateX(10px); }
+  100% { transform: translateX(0);    }
+}
+
+/* ── Audio control (bottom-right, revealed after boot) ───────── */
+#audio-ctrl {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 1000;
+  display: none; /* shown by boot.js after dismissal */
+}
+
+#audio-mute {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  appearance: none;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+#audio-mute:hover {
+  border-color: var(--accent);
+  color: var(--accent-soft);
+  box-shadow: 0 0 12px rgba(176, 58, 58, 0.35);
+}
+
+#audio-mute:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 3px;
+}
+
+#audio-mute.muted { color: #333; border-color: #1e1e1e; }
+
+/* Respect prefers-reduced-motion for boot animations too */
+@media (prefers-reduced-motion: reduce) {
+  .boot--exit,
+  .boot--flicker,
+  #boot.boot--jitter .boot__inner { animation: none !important; opacity: 1; }
+  #boot.boot--chroma .bl          { text-shadow: 0 0 8px rgba(176, 58, 58, 0.55); }
+  .boot__noise                    { display: none !important; }
+  .boot__inner                    { filter: none !important; }
+  #boot-prompt                    { animation: none !important; opacity: 1; }
+}
+
+/* ── System status bar (created by boot.js after dismissal) ──────── */
+#sys-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 800;
+  height: 1.6rem;
+  background: rgba(8, 11, 20, 0.93);
+  border-bottom: 1px solid #1c2130;
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+  display: none;
+  transform: translateY(-100%);
+}
+
+#sys-bar.sys-bar--on {
+  display: block;
+  animation: sysbar-in 0.7s cubic-bezier(0.2, 0, 0.4, 1) forwards;
+}
+
+@keyframes sysbar-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+#sys-bar-track {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  white-space: nowrap;
+  animation: sys-scroll 55s linear infinite;
+}
+
+@keyframes sys-scroll {
+  from { transform: translateX(0);    }
+  to   { transform: translateX(-50%); } /* -50% = one copy (content duplicated) */
+}
+
+/* Individual sys-bar items */
+.si {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: #6b2020;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0 1.1rem;
+}
+
+.si__sep {
+  font-size: 0.45rem;
+  color: #2a1515;
+}
+
+/* Glitch state for random items */
+.si--g {
+  color: #c75a5a;
+  text-shadow: -2px 0 rgba(255, 0, 80, 0.8), 2px 0 rgba(0, 80, 255, 0.6);
+  animation: sbar-g 0.22s steps(3) forwards;
+}
+
+@keyframes sbar-g {
+  0%   { transform: translateX(0);    letter-spacing: 0.09em; }
+  33%  { transform: translateX(-4px); letter-spacing: 0.30em; }
+  66%  { transform: translateX(3px);  letter-spacing: 0em;    }
+  100% { transform: translateX(0);    letter-spacing: 0.09em; }
+}
+
+/* Push page content below the sys-bar */
+body.has-sysbar { padding-top: 1.6rem; }
+
+/* Shrink hero so the waveform visualiser is visible at the fold */
+body.has-sysbar .hero { min-height: calc(100vh - 1.6rem - 80px); }
+
+/* ── Hero scan line (appears after boot, sweeps top→bottom) ──────── */
+body.has-sysbar .hero::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 0;
+  height: 7px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(176, 58, 58, 0.5)  8%,
+    rgba(220, 90, 90, 0.95) 35%,
+    rgba(255, 140, 140, 1)  50%,
+    rgba(220, 90, 90, 0.95) 65%,
+    rgba(176, 58, 58, 0.5)  92%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 22px rgba(199, 90, 90, 0.90),
+    0 0 44px rgba(176, 58, 58, 0.55),
+    0 0 70px rgba(176, 58, 58, 0.28);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  animation: hero-scan 10s ease-in-out infinite 2s;
+}
+
+@keyframes hero-scan {
+  0%   { top: 0%;   opacity: 0;    }
+  2%   { opacity: 1; }
+  98%  { opacity: 0.55; }
+  100% { top: 100%; opacity: 0;    }
+}
+
+/* ── Hero background distortion (same glitch family as boot screen) ─ */
+
+/* Noise canvas — sits between overlay and content, screen blend mode */
+.hero__noise {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Chromatic aberration on hero text during glitch events */
+.hero.hero--chroma .hero__eyebrow {
+  text-shadow:
+    -6px 0 rgba(255, 0, 80, 0.90),
+    6px 0 rgba(0, 80, 255, 0.80),
+    0 0 22px rgba(199, 90, 90, 0.95);
+}
+
+.hero.hero--chroma .hero__tagline,
+.hero.hero--chroma .hero__sub {
+  text-shadow:
+    -4px 0 rgba(255, 0, 60, 0.75),
+    4px 0 rgba(0, 60, 255, 0.65);
+}
+
+/* Overlay flicker: briefly lifts the dark overlay, revealing the raw image */
+.hero.hero--flicker .hero__overlay {
+  animation: hero-ov-flicker 0.24s steps(4) forwards;
+}
+
+@keyframes hero-ov-flicker {
+  0%   { opacity: 1;    }
+  25%  { opacity: 0.30; }
+  50%  { opacity: 0.85; }
+  75%  { opacity: 0.06; }
+  100% { opacity: 1;    }
+}
+
+/* ── prefers-reduced-motion additions ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  body.has-sysbar .hero::before  { animation: none !important; opacity: 0; }
+  .hero.hero--flicker .hero__overlay { animation: none !important; }
+  .standby__prompt               { animation: none !important; opacity: 1; }
+  #sys-bar-track                 { animation: none !important; }
+}
+
+/* ── Toast notifications ──────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  z-index: 700;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 340px;
+}
+
+.toast {
+  font-family: var(--mono);
+  font-size: 0.70rem;
+  background: rgba(8, 11, 20, 0.93);
+  border: 1px solid var(--panel-edge);
+  border-left: 2px solid var(--accent);
+  padding: 0.45rem 0.8rem 0.65rem;
+  letter-spacing: 0.04em;
+  position: relative;
+  overflow: hidden;
+  animation: toast-in 0.28s ease forwards;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.toast__cat {
+  color: var(--accent-soft);
+  margin-right: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.toast__msg {
+  color: var(--muted);
+}
+
+/* Progress bar — shrinks over 4.2s showing remaining life */
+.toast__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  animation: toast-bar 4.2s linear forwards;
+}
+
+.toast--exit {
+  animation: toast-out 0.28s ease forwards !important;
+}
+
+@keyframes toast-in {
+  0%   { opacity: 0; transform: translateX(-18px); filter: brightness(5) blur(3px); }
+  55%  { filter: brightness(1.4) blur(0); }
+  100% { opacity: 1; transform: translateX(0);     filter: brightness(1);           }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0);     }
+  to   { opacity: 0; transform: translateX(-18px); }
+}
+
+@keyframes toast-bar {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* ── Audio waveform visualiser (in document flow, below the hero) ── */
+#visualizer {
+  display: block;
+  width: 100%;
+  height: 80px;
+  cursor: pointer;
+  background: rgba(8, 11, 20, 0.97);
+  border-top: 1px solid rgba(60, 20, 20, 0.6);
+  border-bottom: 1px solid var(--panel-edge);
+  /* Reset any canvas default inline styles */
+  vertical-align: top;
+}
+
+#visualizer:hover {
+  border-top-color: rgba(199, 90, 90, 0.65);
+}
+
+/* No longer needed — visualiser is not fixed-bottom */
+/* body.has-visualizer #audio-ctrl { ... } */

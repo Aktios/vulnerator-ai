@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vulnerator AI — Unholy Pentest</title>
+  <meta name="description" content="An OODA pentest driven by Hermes talking directly to a Kali container via MCP. Death-metal cyberpunk. offerings to the Kali.">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta property="og:title" content="Vulnerator AI — Unholy Pentest">
+  <meta property="og:description" content="An OODA pentest driven by Hermes talking directly to a Kali container via MCP.">
+  <meta property="og:image" content="assets/vulnerator-ai-wallpaper-desktop.jpeg">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/vulnerator-ai-logo-transparent.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+  <!-- boot.js is deferred so it runs after DOM is ready -->
+  <script src="boot.js" defer></script>
+  <!-- page.js: post-boot ambient features (toasts + audio visualiser) -->
+  <script src="page.js" defer></script>
+</head>
+<body>
+
+  <!-- SVG filter definitions for screen displacement glitch -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <!-- Boot screen displacement filter -->
+      <filter id="boot-glitch-filter" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+        <feTurbulence id="bt-turb" type="turbulence"
+          baseFrequency="0.000 0.72" numOctaves="1" seed="7"
+          stitchTiles="stitch" result="turb"/>
+        <feDisplacementMap id="bt-disp"
+          in="SourceGraphic" in2="turb"
+          scale="0" xChannelSelector="R" yChannelSelector="B"/>
+      </filter>
+      <!-- Hero background displacement filter (same family, independent control) -->
+      <filter id="hero-glitch-filter" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+        <feTurbulence id="hg-turb" type="turbulence"
+          baseFrequency="0.000 0.72" numOctaves="1" seed="42"
+          stitchTiles="stitch" result="turb"/>
+        <feDisplacementMap id="hg-disp"
+          in="SourceGraphic" in2="turb"
+          scale="0" xChannelSelector="R" yChannelSelector="B"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- ── Boot sequence overlay ─────────────────────────────────── -->
+  <div id="boot" role="dialog" aria-modal="true" aria-label="VULNERATOR-AI system initialisation">
+    <div class="boot__inner">
+      <div id="boot-output"></div>
+      <p id="boot-prompt">[ ENTER / CLICK → INITIALISE ]</p>
+    </div>
+  </div>
+
+  <!-- Ambient audio – triggered by user gesture inside the boot screen -->
+  <audio id="site-audio" src="assets/vulnerator-ai-song.mp3" loop preload="none"></audio>
+
+  <!-- Audio mute toggle – revealed after boot dismissal -->
+  <div id="audio-ctrl" aria-label="Audio controls">
+    <button id="audio-mute" type="button" aria-label="Mute audio"></button>
+  </div>
+
+  <header class="hero">
+    <picture class="hero__bg">
+      <source media="(max-width: 640px)" srcset="assets/vulnerator-ai-wallpaper-mobile.jpeg">
+      <img src="assets/vulnerator-ai-wallpaper-desktop.jpeg"
+           alt="Cyberpunk key art: a hacker astronaut floating in orbit around a 'DATA HAVEN' station amid drifting servers and circuit boards."
+           decoding="async">
+    </picture>
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+      <p class="hero__eyebrow">Unholy Pentest</p>
+      <img class="hero__logo"
+           src="assets/vulnerator-ai-logo-transparent.png"
+           alt="Vulnerator AI — death-metal lettering logo"
+           width="1536" height="1024" decoding="async">
+      <p class="hero__tagline">offerings to the Kali</p>
+      <p class="hero__sub">summoned from the depths of the OODA abyss &middot; mmxxvi</p>
+      <p class="hero__pitch">
+        An OODA pentest driven by <strong>Hermes</strong> talking
+        <strong>directly</strong> to a <strong>Kali</strong> container via MCP.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <section class="section" aria-labelledby="what-title">
+      <div class="wrap">
+        <h2 class="section__title" id="what-title">What it is</h2>
+        <p class="prose">
+          An OODA (Observe-Orient-Decide-Act) pentest loop where the driving brain is
+          <strong>Hermes</strong> (Nous Research) and the tools run on a Kali governed by an
+          MCP server. Hermes decides what to run and launches it directly against the target.
+        </p>
+        <p class="prose">
+          A deliberately minimal design: <strong>no core, no REST API, no UI, no gates</strong>.
+          Three containers — the agent and two MCP servers — driving the engagement end to end.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="arch-title">
+      <div class="wrap">
+        <h2 class="section__title" id="arch-title">Architecture</h2>
+        <p class="section__lead">Three containers.</p>
+        <ul class="cards" role="list">
+          <li class="card">
+            <h3 class="card__name">kali</h3>
+            <p class="card__body">
+              Deterministic runtime for pentest tools: nmap, nuclei, sqlmap, ffuf, gobuster,
+              Prowler, ScoutSuite and more. Exposes the <code>kali-mcp</code> server.
+            </p>
+          </li>
+          <li class="card">
+            <h3 class="card__name">playwright-mcp</h3>
+            <p class="card__body">
+              A real headless Chromium browser exposed over MCP — the web flank for
+              navigation, DOM and interaction, with zero native toolsets.
+            </p>
+          </li>
+          <li class="card">
+            <h3 class="card__name">ooda-agent</h3>
+            <p class="card__body">
+              Hermes as the OODA loop driver and client of both MCP servers,
+              running the pentest tools directly.
+            </p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="stack-title">
+      <div class="wrap">
+        <h2 class="section__title" id="stack-title">Built with</h2>
+        <ul class="chips" role="list">
+          <li class="chip">Docker</li>
+          <li class="chip">Hermes Agent &middot; Nous Research</li>
+          <li class="chip">Kali Linux</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section section--warn" aria-labelledby="warn-title">
+      <div class="wrap">
+        <aside class="warning" role="note">
+          <h2 class="warning__title" id="warn-title">&#9888; Warning</h2>
+          <p class="warning__body">
+            By default this product has <strong>no guardrails</strong>: no scope-guard, no consent,
+            no authorization gate. There is an <strong>opt-in</strong> scope-guard you can enable,
+            but by default nothing validates the scope. Use this
+            <strong>only against explicitly authorized targets</strong> and in a
+            <strong>controlled environment</strong>. All responsibility for the scope rests with
+            the operator.
+          </p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__wrap">
+      <a class="footer__link" href="https://github.com/irraz/vulnerator-ai" rel="noopener">
+        github.com/irraz/vulnerator-ai
+      </a>
+      <p class="footer__tagline">summoned from the depths of the OODA abyss &middot; mmxxvi</p>
+    </div>
+  </footer>
+</body>
+</html>
