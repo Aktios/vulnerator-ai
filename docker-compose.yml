@@ -98,11 +98,13 @@ services:
         set -e
         # The DEFAULT profile is the root home /opt/data (not /opt/data/profiles/<p>).
         DEF=/opt/data
-        # (a) copy the declarative template (config/SOUL/skills) to the default profile home.
-        mkdir -p "$$DEF/skills"
+        # (a) copy the declarative template (config/SOUL/skills/skins) to the default profile home.
+        mkdir -p "$$DEF/skills" "$$DEF/skins"
         cp /opt/profile-src/profile/config.yaml "$$DEF/config.yaml"
         cp /opt/profile-src/profile/SOUL.md "$$DEF/SOUL.md"
         cp -r /opt/profile-src/skills/. "$$DEF/skills/" 2>/dev/null || true
+        # Copy custom skin(s) so Hermes skin_engine finds them under <hermes_home>/skins/.
+        cp -r /opt/profile-src/profile/skins/. "$$DEF/skins/" 2>/dev/null || true
         # (b) inject the API server KEY (secret, not versioned) BEFORE starting.
         hermes config set platforms.api_server.key "$$HERMES_API_SERVER_KEY" >/dev/null
         # (b2) LLM PROVIDER SELECTION (opt-in, fallback = OpenRouter):
@@ -142,9 +144,23 @@ services:
             hermes config set model.default "$$OPENROUTER_MODEL" >/dev/null
           fi
         fi
-        # (c) start the default profile gateway: foreground (live container) + API server.
+        # (c) print a custom Vulnerator startup banner before handing off to the gateway.
+        printf '\033[1;31m┌────────────────────────────────────────────────────────────┐\033[0m\n'
+        printf '\033[1;31m│\033[0m  \033[1;32m⚡ VULNERATOR-AI — OODA Pentest Engine\033[0m                     \033[1;31m│\033[0m\n'
+        printf '\033[1;31m│\033[0m  \033[2;37mkali-mcp · playwright-mcp · vulnerator-mcp\033[0m                \033[1;31m│\033[0m\n'
+        printf '\033[1;31m└────────────────────────────────────────────────────────────┘\033[0m\n'
+        # (d) start the default profile gateway: foreground (live container) + API server.
         exec hermes gateway run
     environment:
+      # --- Hermes Web Dashboard (OPT-IN via HERMES_DASHBOARD=1) -------------------
+      # The s6-managed dashboard service only starts when HERMES_DASHBOARD is truthy.
+      # Auth for non-loopback binding is provided via basic auth env vars.
+      # Credentials default to admin/vulnerator; override in .env if needed.
+      HERMES_DASHBOARD: "1"
+      HERMES_DASHBOARD_HOST: "0.0.0.0"
+      HERMES_DASHBOARD_PORT: "9119"
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: "${HERMES_DASHBOARD_USER:-admin}"
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: "${HERMES_DASHBOARD_PASSWORD:-vulnerator}"
       # Hermes API server key — required (fail-closed): min 8 chars. TWO paths are
       # needed: the command writes it into platforms.api_server.key (to start the
       # API server) and API_SERVER_KEY validates it on every request (to authenticate the Bearer).
@@ -189,6 +205,9 @@ services:
     # 'ports:' block and drive Hermes with 'docker compose exec ooda-agent curl ...' (see README).
     ports:
       - "${HERMES_API_HOST_PORT:-8642}:8642"
+      # Web dashboard (hermes dashboard --host 0.0.0.0): started by the command block above.
+      # Configurable with HERMES_DASHBOARD_HOST_PORT in .env; default 9119.
+      - "${HERMES_DASHBOARD_HOST_PORT:-9119}:9119"
     depends_on:
       # Wait until kali is healthy (MCP listening) before starting.
       kali:

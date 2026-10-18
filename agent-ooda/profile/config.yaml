@@ -18,6 +18,14 @@
 # La key del LLM la lee Hermes de la variable de entorno OPENROUTER_API_KEY (NO HERMES_LLM_API_KEY):
 # el compose la inyecta tal cual en el proceso y Hermes la toma de ahi. SIN `hermes setup`
 # interactivo y SIN secreto en claro en el repo.
+# --- Skin / branding --------------------------------------------------------
+# Custom skin for Vulnerator. Activates the cyber-red theme, "Vulnerator"
+# agent name, ⚡ prompt symbol, and custom ASCII banner in the TUI and dashboard.
+# The skin YAML is served from agent-ooda/profile/skins/vulnerator.yaml and
+# copied to /opt/data/skins/ by the docker-compose startup script.
+display:
+  skin: "vulnerator"
+
 model:
   # mistral-large-4-0: modelo preparado para el encuadre ofensivo del pentest autorizado. Claude
   # (anthropic/claude-sonnet-*) rechaza el encuadre ofensivo (el safety filter de OpenRouter/
@@ -101,6 +109,7 @@ mcp_servers:
 toolsets:
   - kali                 # MCP de la Kali (dinamico `mcp-kali`): tools de pentest CLI.
   - playwright           # MCP del navegador (dinamico `mcp-playwright`): web real. CERO tools nativas.
+  - todo                 # todo_list: estado vivo del bucle OODA, compresion-resistente (ver SOUL.md).
 
 # Defensa en profundidad (agent.disabled_toolsets, toolsets-reference.md): aunque `toolsets: [kali]`
 # ya excluye lo demas, se desactivan EXPLICITAMENTE los bundles nativos, por si un default de
@@ -156,6 +165,21 @@ platforms:
     enabled: true
     host: "0.0.0.0"   # alcanzable por la red interna del compose
     port: 8642        # NO publicado al host (sin ports: en el compose); solo red interna
+
+# --- Dashboard web ----------------------------------------------------------
+# Hermes' built-in web dashboard. Binds to 0.0.0.0 (port 9119, published to the host via
+# docker-compose.yml ports:) only when an auth provider is registered. We use basic_auth so
+# the container can be reached from the browser without entering the TUI.
+# Credentials: admin / vulnerator (change password and regenerate hash with:
+#   docker exec <ooda-agent> python3 -c "from plugins.dashboard_auth.basic import hash_password; print(hash_password('your-password'))"
+# then update dashboard.basic_auth.password_hash below).
+dashboard:
+  host: "0.0.0.0"
+  port: 9119
+  basic_auth:
+    username: "admin"
+    # Hash for "vulnerator" — regenerate if you change the password.
+    password_hash: "scrypt$16384$8$1$2ZcMvpA3ilGi8e2A3wmOBQ==$IdIdI0Mxd71T2lh7aKc++9/VPPnuGYjgwXIlwNBrVko="
 
 # --- Mensajeria / cron ------------------------------------------------------
 # NO conectar bots de mensajeria ni cron: la mensajeria es un vector de entrada no confiable. Solo
