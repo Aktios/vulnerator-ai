@@ -265,17 +265,19 @@
 
         <p class="qs-tab-label qs-tab-label--lazy">Lazy mode — paste into Claude Code, Kiro or Cursor</p>
         <p class="prose">Drop this into any LLM coding assistant with shell access. It handles everything — you only provide your OpenRouter key when asked.</p>
-        <div class="code-block code-block--lazy">
-          <div class="code-block__bar">
-            <span class="code-block__label">prompt</span>
-            <button class="code-block__copy" id="lazy-copy-btn" type="button" onclick="copyLazyPrompt()" aria-label="Copy prompt">copy</button>
-          </div>
-          <pre class="code-block__body code-block__body--lazy" id="lazy-prompt"><code>You are setting up the "vulnerator-ai" repo for me. Do the following, in order:
+        <div class="lazy-copy-row">
+          <span class="lazy-copy-desc">Full setup prompt (install + MCP wiring)</span>
+          <button class="lazy-copy-btn" id="lazy-copy-btn" type="button" onclick="copyLazyPrompt()" aria-label="Copy setup prompt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="lazy-copy-label">Copy prompt</span>
+          </button>
+        </div>
+        <textarea id="lazy-prompt" aria-hidden="true" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden" tabindex="-1">You are setting up the "vulnerator-ai" repo for me. Do the following, in order:
 
 1. From the repo root, run the installer: ./install.sh
    It is interactive and will ask for ONE value, OPENROUTER_API_KEY — ask me for it
    and pass it through (or run it non-interactively as
-   `OPENROUTER_API_KEY=&lt;the key&gt; ./install.sh`). The installer auto-generates the two
+   `OPENROUTER_API_KEY=<the key> ./install.sh`). The installer auto-generates the two
    secret tokens (HERMES_API_SERVER_KEY, VULNERATOR_MCP_INBOUND_TOKEN), writes the .env,
    and brings the default 4-container stack up. Do NOT invent or ask me for the two
    tokens — the installer makes them.
@@ -299,13 +301,12 @@
                "-e", "HERMES_API_BASE_URL=http://host.docker.internal:8642",
                "vulnerator-ai-mcp:dev"
              ],
-             "env": { "HERMES_API_SERVER_KEY": "&lt;value from .env&gt;" }
+             "env": { "HERMES_API_SERVER_KEY": "<value from .env>" }
            }
          }
        }
 
-4. Confirm the MCP tools are available and report back.</code></pre>
-        </div>
+4. Confirm the MCP tools are available and report back.</textarea>
 
         <p class="prose prose--sm">
           Requires Docker, Docker Compose v2 and an
@@ -477,18 +478,17 @@
 
     // Copy lazy-mode prompt (decode HTML entities before copying)
     function copyLazyPrompt() {
-      var pre = document.getElementById('lazy-prompt');
-      var tmp = document.createElement('textarea');
-      tmp.value = pre.innerText;
-      document.body.appendChild(tmp);
-      tmp.select();
+      var ta = document.getElementById('lazy-prompt');
       try {
-        navigator.clipboard.writeText(tmp.value).catch(function() { document.execCommand('copy'); });
-      } catch(e) { document.execCommand('copy'); }
-      document.body.removeChild(tmp);
-      var btn = document.getElementById('lazy-copy-btn');
-      btn.textContent = 'copied!';
-      setTimeout(function(){ btn.textContent = 'copy'; }, 2000);
+        navigator.clipboard.writeText(ta.value).catch(function() {
+          ta.style.opacity = '1'; ta.select(); document.execCommand('copy'); ta.style.opacity = '0';
+        });
+      } catch(e) {
+        ta.style.opacity = '1'; ta.select(); document.execCommand('copy'); ta.style.opacity = '0';
+      }
+      var lbl = document.getElementById('lazy-copy-label');
+      lbl.textContent = 'Copied!';
+      setTimeout(function(){ lbl.textContent = 'Copy prompt'; }, 2000);
     }
   </script>
 </body>
