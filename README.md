@@ -6,6 +6,10 @@
   <a href="https://github.com/irraz/vulnerator-ai/releases/latest">
     <img src="https://img.shields.io/github/v/release/irraz/vulnerator-ai?style=for-the-badge&label=version&color=b03a3a&labelColor=0a0a0a" alt="Latest release">
   </a>
+  &nbsp;
+  <a href="https://irraz.github.io/vulnerator-ai/">
+    <img src="https://img.shields.io/badge/website-irraz.github.io%2Fvulnerator--ai-b03a3a?style=for-the-badge&labelColor=0a0a0a" alt="Website">
+  </a>
 </p>
 
 <p align="center">
@@ -148,6 +152,7 @@ The README is intentionally short. The detail lives under [`docs/`](docs/):
 
 | Topic | Doc |
 | --- | --- |
+| Project website | [irraz.github.io/vulnerator-ai](https://irraz.github.io/vulnerator-ai/) |
 | Every `.env` variable, AWS creds, local Ollama inference | [`docs/configuration.md`](docs/configuration.md) |
 | Driving a pentest (TUI, MCP client, raw HTTP), the Juice Shop lab, clean restarts | [`docs/usage.md`](docs/usage.md) |
 | The no-guardrails model, opt-in scope-guard, MCP inbound token | [`docs/security.md`](docs/security.md) |

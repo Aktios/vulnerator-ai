@@ -214,6 +214,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the authorized-offensive pentest framing; overriding with such a model may make the agent
   refuse to work.
 
+[1.5.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.5.0
 [1.4.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.4.0
 [1.3.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.3.0
 [1.2.0]: https://github.com/irraz/vulnerator-ai/releases/tag/v1.2.0
