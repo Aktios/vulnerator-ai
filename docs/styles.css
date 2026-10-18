@@ -1722,40 +1722,38 @@ body.has-sysbar .hero::before {
 .screenshot-img:hover { opacity: 1; }
 
 /* ── Lightbox ────────────────────────────────────────────────── */
+
+/* ── Lightbox via <dialog> ─────────────────────────────────────── */
 #lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 9990;
+  border: none;
+  background: transparent;
+  padding: 0;
+  max-width: 95vw;
+  max-height: 95vh;
+}
+#lightbox::backdrop {
   background: rgba(0,0,0,0.92);
-  display: none;
-  align-items: center;
-  justify-content: center;
   cursor: zoom-out;
 }
-#lightbox.lb--open {
-  display: flex;
-}
 #lightbox img {
+  display: block;
   max-width: 92vw;
   max-height: 88vh;
-  border: 1px solid var(--accent);
+  object-fit: contain;
+  border: 1px solid #b03a3a;
   border-radius: 4px;
   box-shadow: 0 0 60px rgba(176,58,58,0.4);
-  object-fit: contain;
 }
 #lightbox-close {
-  position: absolute;
+  position: fixed;
   top: 1.5rem;
   right: 1.5rem;
-  background: transparent;
-  border: 1px solid var(--accent);
+  background: rgba(20,0,0,0.85);
+  border: 1px solid #b03a3a;
   border-radius: 4px;
-  color: var(--accent-soft);
+  color: #c75a5a;
   font-size: 1.1rem;
   cursor: pointer;
   padding: 0.3rem 0.7rem;
-  font-family: var(--mono);
-  transition: background 0.15s;
-  z-index: 1;
+  font-family: ui-monospace, monospace;
 }
-#lightbox-close:hover { background: rgba(176,58,58,0.2); }
