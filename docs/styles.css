@@ -1725,19 +1725,15 @@ body.has-sysbar .hero::before {
 #lightbox {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  z-index: 9990;
   background: rgba(0,0,0,0.92);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   cursor: zoom-out;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
 }
 #lightbox.lb--open {
-  opacity: 1;
-  pointer-events: auto;
+  display: flex;
 }
 #lightbox img {
   max-width: 92vw;
@@ -1746,7 +1742,6 @@ body.has-sysbar .hero::before {
   border-radius: 4px;
   box-shadow: 0 0 60px rgba(176,58,58,0.4);
   object-fit: contain;
-  transition: transform 0.2s ease;
 }
 #lightbox-close {
   position: absolute;
@@ -1761,5 +1756,6 @@ body.has-sysbar .hero::before {
   padding: 0.3rem 0.7rem;
   font-family: var(--mono);
   transition: background 0.15s;
+  z-index: 1;
 }
 #lightbox-close:hover { background: rgba(176,58,58,0.2); }
