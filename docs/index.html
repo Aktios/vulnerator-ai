@@ -79,6 +79,21 @@
         An OODA pentest driven by <strong>Hermes</strong> talking
         <strong>directly</strong> to a <strong>Kali</strong> container via MCP.
       </p>
+      <div class="hero__cta">
+        <a class="cta-btn cta-btn--primary" href="https://github.com/irraz/vulnerator-ai" rel="noopener" target="_blank">
+          <svg class="cta-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+        <a class="cta-btn cta-btn--secondary" href="#quick-start">Quick Start</a>
+      </div>
+      <div class="hero__badges">
+        <span class="hbadge">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .587l3.668 7.568L24 9.306l-6 5.849 1.416 8.245L12 19.083l-7.416 4.317L6 15.155 0 9.306l8.332-1.151z"/></svg>
+          <span id="gh-stars">—</span> stars
+        </span>
+        <span class="hbadge">v<span id="version-badge">1.4.0</span></span>
+        <span class="hbadge hbadge--green">Open Source · MIT</span>
+      </div>
     </div>
   </header>
 
@@ -154,15 +169,272 @@
         </aside>
       </div>
     </section>
+
+    <!-- ── Engagement modes ── -->
+    <section class="section" aria-labelledby="modes-title" id="modes">
+      <div class="wrap">
+        <h2 class="section__title" id="modes-title">Engagement modes</h2>
+        <p class="prose">Declare the mode at the start of every engagement. The agent enforces the scope itself.</p>
+        <ul class="cards" role="list">
+          <li class="card card--green">
+            <h3 class="card__name card__name--green">mode: pentest</h3>
+            <p class="card__body">
+              Stop at exploitability evidence. Confirms the crash, documents the CVE, records CVSS,
+              affected / patched versions and remediation steps. <strong>No root shell.</strong>
+              Delivers an enriched Markdown + HTML report.
+            </p>
+          </li>
+          <li class="card card--red">
+            <h3 class="card__name">mode: redteam · ctf</h3>
+            <p class="card__body">
+              Full compromise. Exploit, escalate, capture objectives (flags, credentials, data).
+              Uses all available resources. The agent stops only when the objective is reached
+              or all routes are exhausted.
+            </p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── OODA engine features ── -->
+    <section class="section" aria-labelledby="features-title" id="features">
+      <div class="wrap">
+        <h2 class="section__title" id="features-title">OODA engine</h2>
+        <p class="section__lead">Observe &rarr; Orient &rarr; Decide &rarr; Act &rarr; Report</p>
+        <ul class="feature-list" role="list">
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>Direct MCP execution</strong> — Hermes calls tools directly on Kali. No intermediate API, no validation layer, no overhead. When it calls <code>mcp_kali_kali_run</code>, the shell command runs for real and returns real output.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>Evidence discipline</strong> — only real tool output counts as evidence. The agent cannot cite a CVE or advisory it did not find in an actual tool result. Failed searches count as steps without progress.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>Durable finding store</strong> — <code>record_finding</code> / <code>read_findings</code> persist across context compression and session restarts. The ORIENT phase always reloads the store before reasoning.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>OODA task list</strong> — structured <code>todo_list</code> (OBSERVE / ORIENT / DECIDE / ACT / REPORT) survives context compression and is visible in the session chat throughout the engagement.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>Web + CLI in parallel</strong> — Playwright MCP gives the agent a real Chromium browser for web pentesting (DOM, XSS, JS-rendered SPAs) alongside Kali CLI tools. No native browser toolset.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>Two-layer pentest report</strong> — <code>report_gen.py</code> produces a structured Markdown base from the finding store; the agent enriches it with session context and renders a standalone HTML report with the Vulnerator-AI visual theme.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>MCP front door</strong> — the <code>vulnerator-mcp</code> container exposes Hermes runs as MCP tools so any MCP client (Claude Code, Kiro, custom tooling) can trigger, steer and observe a pentest programmatically.
+            </div>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">&#9651;</span>
+            <div>
+              <strong>Hermes web dashboard</strong> — built-in browser UI at <code>:9119</code> with the Vulnerator-AI skin (dark red/green cyber theme, custom OODA spinner verbs, block ASCII banner). No TUI required.
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── Quick start ── -->
+    <section class="section" aria-labelledby="quick-start-title" id="quick-start">
+      <div class="wrap">
+        <h2 class="section__title" id="quick-start-title">Quick start</h2>
+        <p class="prose">One command. The installer asks for your OpenRouter key and brings the stack up.</p>
+        <div class="code-block">
+          <div class="code-block__bar">
+            <span class="code-block__label">bash</span>
+            <button class="code-block__copy" type="button" onclick="navigator.clipboard.writeText('git clone https://github.com/irraz/vulnerator-ai && cd vulnerator-ai && ./install.sh')" aria-label="Copy command">copy</button>
+          </div>
+          <pre class="code-block__body"><code><span class="cg">git clone</span> https://github.com/irraz/vulnerator-ai
+<span class="cg">cd</span> vulnerator-ai
+<span class="ca">./install.sh</span></code></pre>
+        </div>
+        <p class="prose prose--sm">
+          Requires Docker, Docker Compose v2 and an
+          <a href="https://openrouter.ai/" rel="noopener" target="_blank">OpenRouter</a> API key
+          (or a local <a href="https://ollama.com/" rel="noopener" target="_blank">Ollama</a> endpoint).
+          Tested on macOS (Apple Silicon) and Linux x86-64.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Labs ── -->
+    <section class="section" aria-labelledby="labs-title" id="labs">
+      <div class="wrap">
+        <h2 class="section__title" id="labs-title">Practice labs</h2>
+        <p class="prose">Isolated, disposable Docker environments for testing the OODA agent against real vulnerabilities without internet-facing risk.</p>
+        <ul class="labs-list" role="list">
+          <li class="lab-card">
+            <div class="lab-card__header">
+              <span class="lab-card__tag">LPE</span>
+              <span class="lab-card__tag lab-card__tag--red">CVE-2023-4911</span>
+              <span class="lab-card__tag lab-card__tag--dim">x86-64</span>
+            </div>
+            <h3 class="lab-card__name">looney-tunables-ctf</h3>
+            <p class="lab-card__body">
+              Ubuntu 23.04 container with glibc <code>2.37-0ubuntu2</code> pinned at the vulnerable
+              revision (pre-patch). The agent must enumerate the system, discover CVE-2023-4911
+              (Looney Tunables — <code>GLIBC_TUNABLES</code> buffer overflow in <code>ld.so</code>,
+              CVSS 7.8), and either demonstrate exploitability (pentest mode) or obtain a root shell
+              (redteam mode) using the gcc toolchain installed on the target. No hints about the
+              vulnerability are given.
+            </p>
+            <div class="lab-card__meta">
+              <span>Ubuntu 23.04 lunar</span>
+              <span>&middot;</span>
+              <span>SSH access · agent_user</span>
+              <span>&middot;</span>
+              <span>ASLR level 2</span>
+            </div>
+            <div class="lab-card__links">
+              <a href="https://github.com/irraz/vulnerator-ai/tree/master/labs/looney-tunables-ctf" rel="noopener" target="_blank" class="lab-link">Lab source</a>
+              <a href="pentest-report-example.html" class="lab-link lab-link--report">Sample pentest report &rarr;</a>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── Sample reports ── -->
+    <section class="section" aria-labelledby="reports-title" id="reports">
+      <div class="wrap">
+        <h2 class="section__title" id="reports-title">Sample reports</h2>
+        <p class="prose">Real output from the agent running in <code>mode: pentest</code>. Two-layer report: structured evidence from the finding store + LLM narrative enrichment, rendered with the Vulnerator-AI visual theme.</p>
+        <ul class="report-cards" role="list">
+          <li class="report-card">
+            <div class="report-card__top">
+              <span class="report-card__cvss">7.8</span>
+              <div>
+                <p class="report-card__cve">CVE-2023-4911 — Looney Tunables</p>
+                <p class="report-card__target">ubuntu-server-01 · Ubuntu 23.04 · looney-tunables-ctf lab</p>
+              </div>
+            </div>
+            <p class="report-card__summary">
+              glibc 2.37 buffer overflow in <code>ld.so</code> via <code>GLIBC_TUNABLES</code>.
+              Exploitability demonstrated: 10/10 SIGSEGV on SUID binaries with differential controls.
+              OODA loop closed in 14 steps.
+            </p>
+            <a href="pentest-report-example.html" class="report-link">View full report &rarr;</a>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── Open source ── -->
+    <section class="section" aria-labelledby="oss-title" id="oss">
+      <div class="wrap">
+        <h2 class="section__title" id="oss-title">Open source</h2>
+        <div class="oss-block">
+          <div class="oss-block__text">
+            <p class="prose">
+              Vulnerator-AI is <strong>fully open source</strong> under the MIT licence.
+              Read the code, fork it, extend it, run it against your own infrastructure.
+              The SOUL.md, skills, config and all OODA loop logic are plain text files you
+              can read and modify without touching a binary.
+            </p>
+            <ul class="oss-links" role="list">
+              <li><a href="https://github.com/irraz/vulnerator-ai" rel="noopener" target="_blank">github.com/irraz/vulnerator-ai</a> — source, issues, PRs</li>
+              <li><a href="https://github.com/irraz/vulnerator-ai/releases" rel="noopener" target="_blank">Releases</a> — changelog and versioned packages</li>
+              <li><a href="https://github.com/irraz/vulnerator-ai/tree/master/docs" rel="noopener" target="_blank">docs/</a> — configuration, usage, security model</li>
+            </ul>
+          </div>
+          <div class="oss-block__stat">
+            <a class="gh-btn" href="https://github.com/irraz/vulnerator-ai" rel="noopener" target="_blank" aria-label="Star on GitHub">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+              Star on GitHub
+            </a>
+            <p class="gh-stars-count"><span id="gh-stars-oss">—</span> stars</p>
+            <p class="gh-version">v<span id="version-oss">1.4.0</span> · MIT</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--warn" aria-labelledby="warn-title">
+      <div class="wrap">
+        <aside class="warning" role="note">
+          <h2 class="warning__title" id="warn-title">&#9888; Warning</h2>
+          <p class="warning__body">
+            By default this product has <strong>no guardrails</strong>: no scope-guard, no consent,
+            no authorization gate. There is an <strong>opt-in</strong> scope-guard you can enable,
+            but by default nothing validates the scope. Use this
+            <strong>only against explicitly authorized targets</strong> and in a
+            <strong>controlled environment</strong>. All responsibility for the scope rests with
+            the operator.
+          </p>
+        </aside>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
     <div class="wrap footer__wrap">
-      <a class="footer__link" href="https://github.com/irraz/vulnerator-ai" rel="noopener">
-        github.com/irraz/vulnerator-ai
-      </a>
+      <div class="footer__top">
+        <div class="footer__brand">
+          <span class="footer__name">VULNERATOR-AI</span>
+          <span class="footer__version">v<span id="version-footer">1.4.0</span></span>
+          <span class="footer__oss">Open Source · MIT</span>
+        </div>
+        <div class="footer__links">
+          <a href="https://github.com/irraz/vulnerator-ai" rel="noopener" target="_blank" class="footer__link footer__link--gh">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            github.com/irraz/vulnerator-ai
+          </a>
+          <a href="pentest-report-example.html" class="footer__link">Sample report</a>
+          <a href="https://github.com/irraz/vulnerator-ai/blob/master/docs/usage.md" rel="noopener" target="_blank" class="footer__link">Docs</a>
+        </div>
+      </div>
       <p class="footer__tagline">summoned from the depths of the OODA abyss &middot; mmxxvi</p>
     </div>
   </footer>
+
+  <script>
+    // Fetch live GitHub stats (stars + latest release version)
+    (function () {
+      function setAll(id, val) {
+        document.querySelectorAll(id).forEach(function(el){ el.textContent = val; });
+      }
+      fetch('https://api.github.com/repos/irraz/vulnerator-ai')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (d.stargazers_count !== undefined) {
+            var s = d.stargazers_count.toLocaleString();
+            setAll('#gh-stars', s);
+            setAll('#gh-stars-oss', s);
+          }
+        })
+        .catch(function(){});
+      fetch('https://api.github.com/repos/irraz/vulnerator-ai/releases/latest')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (d.tag_name) {
+            var v = d.tag_name.replace(/^v/, '');
+            setAll('#version-badge', v);
+            setAll('#version-oss', v);
+            setAll('#version-footer', v);
+          }
+        })
+        .catch(function(){});
+    })();
+  </script>
 </body>
 </html>
