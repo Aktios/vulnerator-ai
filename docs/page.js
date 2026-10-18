@@ -306,16 +306,15 @@ function initKaraoke(audioEl) {
     { t: 160.18, text: 'Rise and strike!',                    s: 'chorus' },
     { t: 162.49, text: 'VULNERATOR!',                         s: 'chorus' },
     { t: 164.81, text: 'Own the night!',                      s: 'chorus' },
-    { t: 170.08, text: 'Observe!',                            s: 'bridge' },
-    { t: 171.47, text: 'Orient!',                             s: 'bridge' },
-    { t: 172.87, text: 'Decide!',                             s: 'bridge' },
-    { t: 174.26, text: 'ACT!',                                s: 'bridge' },
-    { t: 175.65, text: 'Observe!',                            s: 'bridge' },
-    { t: 177.04, text: 'Orient!',                             s: 'bridge' },
-    { t: 178.44, text: 'Decide!',                             s: 'bridge' },
-    { t: 179.83, text: 'ACT!',                                s: 'bridge' },
+    { t: 186.00, text: 'Observe!',                            s: 'bridge' },
+    { t: 186.81, text: 'Orient!',                             s: 'bridge' },
+    { t: 187.62, text: 'Decide!',                             s: 'bridge' },
+    { t: 188.43, text: 'ACT!',                                s: 'bridge' },
+    { t: 190.50, text: 'Observe!',                            s: 'bridge' },
+    { t: 191.31, text: 'Orient!',                             s: 'bridge' },
+    { t: 192.12, text: 'Decide!',                             s: 'bridge' },
+    { t: 192.93, text: 'ACT!',                                s: 'bridge' },
     // Post-bridge — "Own the night!" repetitions + final chorus
-    { t: 191.86, text: 'Own the night!',                      s: 'chorus' },
     { t: 201.50, text: 'Own the night!',                      s: 'chorus' },
     { t: 209.50, text: 'Own the night!',                      s: 'chorus' },
     // Final chorus (precise Whisper timestamps)
@@ -356,6 +355,17 @@ function initKaraoke(audioEl) {
     let lastIdx = -1;
     let fadeOutTimer = null;
 
+    // ── VULNERATOR flash overlay ──────────────────────────────────
+    var flashEl = document.createElement('div');
+    flashEl.id = 'vuln-flash';
+    document.body.appendChild(flashEl);
+
+    function triggerFlash() {
+      flashEl.classList.remove('vuln-flash--go');
+      void flashEl.offsetWidth; // force reflow — restart animation
+      flashEl.classList.add('vuln-flash--go');
+    }
+
     function showLine(idx) {
       const entry = lines[idx];
       clearTimeout(fadeOutTimer);
@@ -363,6 +373,9 @@ function initKaraoke(audioEl) {
       // Set section class + text before making visible
       lineEl.className = 'kl kl--' + entry.s;
       lineEl.textContent = entry.text;
+
+      // VULNERATOR flash
+      if (entry.text === 'VULNERATOR!') triggerFlash();
 
       // Force opacity via style (more reliable than CSS animation on Android Chrome)
       lineEl.style.transition = 'none';

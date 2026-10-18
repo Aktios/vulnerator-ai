@@ -1414,3 +1414,32 @@ body.has-sysbar .hero::before {
   .ab-vol-wrap { width: 3.5rem; }
   .ab-dur      { display: none; }
 }
+
+/* ── VULNERATOR! inversion flash ──────────────────────────────── */
+#vuln-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 9800;
+  pointer-events: none;
+  background: #ffffff;
+  mix-blend-mode: difference;
+  opacity: 0;
+}
+
+#vuln-flash.vuln-flash--go {
+  animation: vuln-flash 0.55s ease forwards;
+}
+
+@keyframes vuln-flash {
+  0%   { opacity: 0;    }
+  10%  { opacity: 0.95; }   /* ← invert */
+  28%  { opacity: 0;    }   /* ← back */
+  42%  { opacity: 0.75; }   /* ← second hit (softer) */
+  60%  { opacity: 0;    }
+  100% { opacity: 0;    }
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  #vuln-flash.vuln-flash--go { animation: none; }
+}
