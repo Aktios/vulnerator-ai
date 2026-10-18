@@ -5,6 +5,42 @@ All notable changes to Vulnerator AI are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-18
+
+### Added
+
+- **Hermes web dashboard** on `:9119` — built-in browser UI activated via `HERMES_DASHBOARD=1`
+  with basic-auth and the Vulnerator-AI custom skin (dark red/green cyber theme, block ASCII
+  banner, `⚡` prompt symbol, OODA spinner verbs).
+- **`labs/looney-tunables-ctf`** — isolated CVE-2023-4911 (glibc 2.37 LPE) lab. Includes uname
+  wrapper to mask linuxkit kernel false positives, tini as PID 1, and documented engagement
+  prompts for both `mode: pentest` and `mode: ctf`.
+- **`labs/pinguinazo-ssti`** — Flask/Jinja2 SSTI reverse-shell lab. Attack path: SSTI → RCE →
+  reverse shell to kali → sudo java → root. Integrates with `vulnerator-ai_default` network for
+  reverse shell routing. Inspired by dockerlabs.es "Pinguinazo".
+- **`pentest-report` skill v0.3** — two-layer report: `report_gen.py` structured base + LLM
+  narrative enrichment + standalone HTML with Vulnerator-AI visual theme.
+- **Landing web** (`docs/`): CRT boot screen with lens/barrel effect, Whisper-synced karaoke
+  lyrics, audio controls bar, VULNERATOR! page inversion flash, scroll reveal animations,
+  content drawer, screenshot lightbox, CTF and pentest sample reports.
+- **`todo` toolset** enabled so the agent uses `todo_list` for structured OODA state tracking
+  across context compression and session restarts.
+
+### Changed
+
+- **SOUL.md** — multiple improvements:
+  - `modo: pentest` vs `modo: redteam/ctf` engagement mode selection.
+  - Evidence discipline: only real tool output counts; zero search results = "not found".
+  - 3-step no-progress counter with concrete, exhaustive criteria.
+  - ORIENT phase always calls `read_findings` to reload engagement state.
+  - `todo_list` structured template (OBSERVE/ORIENT/DECIDE/ACT/REPORT).
+  - Reverse shell guidance via `kali_exec` background listener.
+  - Container environment awareness: userspace vulns work in containers.
+  - OODA format label `OODA — <FASE> (paso <N>)` enforced as mandatory.
+  - Ephemeral system prompt reinforces format on every turn.
+- **`config.yaml`** — `todo` added to toolsets; `display.skin: vulnerator` activates custom skin.
+- **`docker-compose.yml`** — `HERMES_DASHBOARD=1` + basic-auth env vars; port 9119 published.
+
 ## [1.4.0] - 2026-10-16
 
 ### Added
