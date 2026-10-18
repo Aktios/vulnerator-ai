@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 2026-10-16
 
+### Added
+- **`install.sh` easy installer.** An interactive installer that reduces first-run setup to a single
+  input: the `OPENROUTER_API_KEY`. It checks prerequisites (`docker`, `docker compose` v2,
+  `openssl`), auto-generates the two secret tokens `HERMES_API_SERVER_KEY` and
+  `VULNERATOR_MCP_INBOUND_TOKEN` as **separate** 32-byte hex values (`openssl rand -hex 32`), builds
+  the `.env` from `.env.example` (filling in only those three keys and preserving every other default
+  and the template comments), and brings the **default** stack up with `docker compose up -d --build`
+  — **without** the Juice Shop lab. The OpenRouter key is read with no terminal echo, or taken from an
+  exported `OPENROUTER_API_KEY` for non-interactive runs. Flags: `--with-juice-shop` (also start the
+  OWASP Juice Shop practice lab), `--no-up` (write the `.env` only), `--force` (overwrite an existing
+  `.env`; otherwise it refuses to clobber one). The manual `cp .env.example .env` path still works.
+- **README "Let an AI assistant set it up for you" block.** A copy-paste prompt the user hands to an
+  LLM coding assistant (Claude Code / Kiro / Cursor) with shell access, so the assistant runs
+  `install.sh` and wires up the `vulnerator-mcp` stdio server end to end — the user only supplies the
+  OpenRouter key when asked.
+
 ### Changed
+- **README trimmed to a short Quick Start; detail moved into `docs/`.** The README now leads with the
+  `./install.sh` Quick Start (plus a collapsed manual-setup fallback) and a documentation index,
+  keeping only a condensed architecture summary and the authorized-use warning. The long-form content
+  was split into new topic docs: `docs/configuration.md` (every `.env` variable, AWS credentials,
+  local Ollama inference), `docs/usage.md` (driving a pentest via TUI / MCP client / raw HTTP, the
+  Juice Shop lab, clean restarts between exercises), and `docs/security.md` (the no-guardrails model,
+  the opt-in scope-guard, the MCP inbound token). No behavior changed; this is a documentation
+  reorganization.
 - **`pentest-report` now emits the report in English.** `docker/kali/report_gen.py` previously
   rendered the Markdown deliverable in Spanish; its output strings (section headings, status
   labels, executive summary, methodology, evidence labels, and the `main` summary line) are now
