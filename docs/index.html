@@ -250,6 +250,8 @@
     <section class="section" aria-labelledby="quick-start-title" id="quick-start">
       <div class="wrap">
         <h2 class="section__title" id="quick-start-title">Quick start</h2>
+
+        <p class="qs-tab-label">Manual</p>
         <p class="prose">One command. The installer asks for your OpenRouter key and brings the stack up.</p>
         <div class="code-block">
           <div class="code-block__bar">
@@ -260,6 +262,51 @@
 <span class="cg">cd</span> vulnerator-ai
 <span class="ca">./install.sh</span></code></pre>
         </div>
+
+        <p class="qs-tab-label qs-tab-label--lazy">Lazy mode — paste into Claude Code, Kiro or Cursor</p>
+        <p class="prose">Drop this into any LLM coding assistant with shell access. It handles everything — you only provide your OpenRouter key when asked.</p>
+        <div class="code-block code-block--lazy">
+          <div class="code-block__bar">
+            <span class="code-block__label">prompt</span>
+            <button class="code-block__copy" id="lazy-copy-btn" type="button" onclick="copyLazyPrompt()" aria-label="Copy prompt">copy</button>
+          </div>
+          <pre class="code-block__body code-block__body--lazy" id="lazy-prompt"><code>You are setting up the "vulnerator-ai" repo for me. Do the following, in order:
+
+1. From the repo root, run the installer: ./install.sh
+   It is interactive and will ask for ONE value, OPENROUTER_API_KEY — ask me for it
+   and pass it through (or run it non-interactively as
+   `OPENROUTER_API_KEY=&lt;the key&gt; ./install.sh`). The installer auto-generates the two
+   secret tokens (HERMES_API_SERVER_KEY, VULNERATOR_MCP_INBOUND_TOKEN), writes the .env,
+   and brings the default 4-container stack up. Do NOT invent or ask me for the two
+   tokens — the installer makes them.
+
+2. Wait until the stack is healthy, then verify with: docker compose ps
+
+3. Register the local MCP server (stdio mode — zero network surface, no inbound token).
+   First build the image:
+       docker build -f docker/mcp/Dockerfile -t vulnerator-ai-mcp:dev .
+   Then add this entry to my assistant's MCP config (mcpServers), filling
+   HERMES_API_SERVER_KEY with the value the installer wrote into the .env
+   (read it from there, do not print it):
+       {
+         "mcpServers": {
+           "vulnerator-mcp": {
+             "command": "docker",
+             "args": [
+               "run", "-i", "--rm",
+               "--add-host", "host.docker.internal:host-gateway",
+               "-e", "HERMES_API_SERVER_KEY",
+               "-e", "HERMES_API_BASE_URL=http://host.docker.internal:8642",
+               "vulnerator-ai-mcp:dev"
+             ],
+             "env": { "HERMES_API_SERVER_KEY": "&lt;value from .env&gt;" }
+           }
+         }
+       }
+
+4. Confirm the MCP tools are available and report back.</code></pre>
+        </div>
+
         <p class="prose prose--sm">
           Requires Docker, Docker Compose v2 and an
           <a href="https://openrouter.ai/" rel="noopener" target="_blank">OpenRouter</a> API key
@@ -427,6 +474,22 @@
         })
         .catch(function(){});
     })();
+
+    // Copy lazy-mode prompt (decode HTML entities before copying)
+    function copyLazyPrompt() {
+      var pre = document.getElementById('lazy-prompt');
+      var tmp = document.createElement('textarea');
+      tmp.value = pre.innerText;
+      document.body.appendChild(tmp);
+      tmp.select();
+      try {
+        navigator.clipboard.writeText(tmp.value).catch(function() { document.execCommand('copy'); });
+      } catch(e) { document.execCommand('copy'); }
+      document.body.removeChild(tmp);
+      var btn = document.getElementById('lazy-copy-btn');
+      btn.textContent = 'copied!';
+      setTimeout(function(){ btn.textContent = 'copy'; }, 2000);
+    }
   </script>
 </body>
 </html>

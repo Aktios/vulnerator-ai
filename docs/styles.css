@@ -1185,3 +1185,31 @@ body.has-sysbar .hero::before {
   .footer__top { flex-direction: column; }
   .hero__cta { flex-direction: column; align-items: center; }
 }
+
+/* ── Lazy mode / prompt block ─────────────────────────────────── */
+.qs-tab-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin: 2rem 0 0.5rem;
+}
+.qs-tab-label--lazy { color: var(--accent-soft); }
+.qs-tab-label--lazy::before { content: "⚡ "; }
+
+.code-block--lazy { border-color: rgba(176, 58, 58, 0.4); max-width: 100%; }
+.code-block--lazy .code-block__bar { border-color: rgba(176, 58, 58, 0.25); }
+.code-block--lazy .code-block__label { color: var(--accent-soft); }
+
+.code-block__body--lazy {
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.80rem;
+  color: #e8e8e8;
+  scrollbar-width: thin;
+  scrollbar-color: #330000 #0a0000;
+}
+.code-block__body--lazy::-webkit-scrollbar { width: 6px; }
+.code-block__body--lazy::-webkit-scrollbar-track { background: #0a0000; }
+.code-block__body--lazy::-webkit-scrollbar-thumb { background: #330000; border-radius: 3px; }
+.code-block__body--lazy code { color: #e8e8e8; }
