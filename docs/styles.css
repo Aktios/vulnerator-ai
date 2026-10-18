@@ -1664,3 +1664,58 @@ body.has-sysbar .hero::before {
 @media (max-width: 380px) {
   .bl { font-size: 0.62rem; }
 }
+
+/* ── Report mode badges ────────────────────────────────────────── */
+.report-card__mode {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.report-card__mode--pentest { background: #002244; color: #4488ff; border: 1px solid #224488; }
+.report-card__mode--ctf     { background: #1a0000; color: #ff4444; border: 1px solid #550000; }
+
+.report-card__cvss--ctf {
+  background: #330000;
+  color: #ff4444;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.report-link--ctf { color: #ff6666; }
+.report-link--ctf:hover { color: var(--magenta); }
+
+/* ── Screenshots grid ──────────────────────────────────────────── */
+.screenshots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+}
+.screenshot-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-top: 2px solid var(--accent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.screenshot-label {
+  padding: 0.6rem 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--panel-edge);
+  background: var(--bg-deep);
+}
+.screenshot-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+.screenshot-img:hover { opacity: 1; }
