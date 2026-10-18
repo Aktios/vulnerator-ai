@@ -1,11 +1,12 @@
-# vulnerator.yaml — custom Hermes skin for the Vulnerator OODA pentest engine.
+# vulnerator.yaml — custom Hermes skin for the Vulnerator-AI OODA pentest engine.
+# Palette aligned with the Vulnerator-AI landing page (irraz.github.io/vulnerator-ai).
 # Loaded by Hermes skin_engine from <hermes_home>/skins/vulnerator.yaml.
 # Activated via `display.skin: vulnerator` in config.yaml.
 # Copied from agent-ooda/profile/skins/ to /opt/data/skins/ by the
 # docker-compose ooda-agent startup script on every container boot.
 
 name: "vulnerator"
-description: "Vulnerator OODA engine — red-team cyber theme"
+description: "Vulnerator-AI OODA engine — dark red / cyber theme (aligned with landing page)"
 
 # ── Branding ──────────────────────────────────────────────────────────────────
 branding:
@@ -16,36 +17,56 @@ branding:
   prompt_symbol: "⚡"
   help_header: "(⚡) Available Commands"
 
-# ── Colors (dark red / cyber-green palette) ───────────────────────────────────
+# ── Colors — aligned with landing page palette ────────────────────────────────
+# Landing page variables for reference:
+#   --bg: #0a0a0a  --bg-deep: #080b14  --panel: #10131c  --panel-edge: #1c2130
+#   --text: #e6e8ec  --muted: #9aa0ac  --accent: #b03a3a  --accent-soft: #c75a5a
 colors:
-  banner_border:             "#CC0000"
-  banner_title:              "#00FF41"
-  banner_accent:             "#FF4444"
-  banner_dim:                "#AA2222"
-  banner_text:               "#E8E8E8"
-  ui_accent:                 "#FF4444"
-  ui_label:                  "#CC3333"
-  ui_ok:                     "#00FF41"
-  ui_error:                  "#FF2222"
-  ui_warn:                   "#FF8800"
-  prompt:                    "#E8E8E8"
-  input_rule:                "#CC0000"
-  response_border:           "#00FF41"
-  status_bar_bg:             "#180000"
-  status_bar_text:           "#BB8888"
-  status_bar_strong:         "#00FF41"
-  status_bar_dim:            "#663333"
-  status_bar_good:           "#00FF41"
-  status_bar_warn:           "#FF8800"
-  status_bar_bad:            "#FF4444"
-  status_bar_critical:       "#FF0000"
-  session_label:             "#CC3333"
-  session_border:            "#882222"
-  completion_menu_bg:        "#180000"
-  completion_menu_current_bg: "#3A0000"
-  selection_bg:              "#2A0000"
-  shell_dollar:              "#00FF41"
-  voice_status_bg:           "#180000"
+  # Banner
+  banner_border:                 "#b03a3a"   # landing --accent
+  banner_title:                  "#00FF41"   # matrix green — pentest identity
+  banner_accent:                 "#c75a5a"   # landing --accent-soft
+  banner_dim:                    "#663333"
+  banner_text:                   "#e6e8ec"   # landing --text
+
+  # UI
+  ui_accent:                     "#c75a5a"   # landing --accent-soft
+  ui_label:                      "#9aa0ac"   # landing --muted
+  ui_ok:                         "#00FF41"   # matrix green for success
+  ui_error:                      "#ef5350"
+  ui_warn:                       "#ffa726"
+
+  # Input / prompt
+  prompt:                        "#e6e8ec"   # landing --text
+  input_rule:                    "#b03a3a"   # landing --accent
+
+  # Response
+  response_border:               "#c75a5a"   # landing --accent-soft
+
+  # Status bar — deep space blue-black from landing
+  status_bar_bg:                 "#080b14"   # landing --bg-deep
+  status_bar_text:               "#9aa0ac"   # landing --muted
+  status_bar_strong:             "#00FF41"
+  status_bar_dim:                "#1c2130"   # landing --panel-edge
+  status_bar_good:               "#00FF41"
+  status_bar_warn:               "#ffa726"
+  status_bar_bad:                "#c75a5a"
+  status_bar_critical:           "#b03a3a"
+
+  # Sessions
+  session_label:                 "#c75a5a"
+  session_border:                "#1c2130"   # landing --panel-edge
+
+  # Completion menu — landing panel tones
+  completion_menu_bg:            "#0a0a0a"   # landing --bg
+  completion_menu_current_bg:    "#10131c"   # landing --panel
+  completion_menu_meta_bg:       "#080b14"   # landing --bg-deep
+  completion_menu_meta_current_bg: "#1c2130" # landing --panel-edge
+
+  # Selection / shell
+  selection_bg:                  "#10131c"   # landing --panel
+  shell_dollar:                  "#00FF41"
+  voice_status_bg:               "#080b14"   # landing --bg-deep
 
 # ── Spinner ───────────────────────────────────────────────────────────────────
 spinner:
@@ -78,28 +99,83 @@ spinner:
 
 tool_prefix: "▸"
 
-# ── Banner logo (TUI — shown when terminal width ≥ 95 cols) ───────────────────
-# Rich-markup block-character ASCII art for "VULNERATOR".
-# Each row spans V·U·L·N·E·R·A·T·O·R in the standard Hermes block font.
+# ── Tool emojis — per-tool overrides ─────────────────────────────────────────
+tool_emojis:
+  kali_run:       "⚔"
+  kali_exec:      "⚡"
+  record_finding: "📌"
+  read_findings:  "📋"
+  kali_run_async: "⚡"
+
+# ── Banner logo ───────────────────────────────────────────────────────────────
 banner_logo: |
-  [bold #CC0000]██╗   ██╗██╗   ██╗██╗     ███╗   ██╗███████╗██████╗  █████╗ ████████╗ ██████╗ ██████╗ [/]
-  [bold #DD1111]██║   ██║██║   ██║██║     ████╗  ██║██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗[/]
-  [#EE2222]██║   ██║██║   ██║██║     ██╔██╗ ██║█████╗  ██████╔╝███████║   ██║   ██║   ██║██████╔╝[/]
-  [#FF3333]╚██╗ ██╔╝██║   ██║██║     ██║╚██╗██║██╔══╝  ██╔══██╗██╔══██║   ██║   ██║   ██║██╔══██╗[/]
-  [#FF5555] ╚████╔╝ ╚██████╔╝███████╗██║ ╚████║███████╗██║  ██║██║  ██║   ██║   ╚██████╔╝██║  ██║[/]
-  [#FF7777]  ╚═══╝   ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝[/]
+  [bold #b03a3a]██╗   ██╗██╗   ██╗██╗     ███╗   ██╗███████╗██████╗  █████╗ ████████╗ ██████╗ ██████╗ [/]
+  [bold #c04040]██║   ██║██║   ██║██║     ████╗  ██║██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗[/]
+  [#c75a5a]██║   ██║██║   ██║██║     ██╔██╗ ██║█████╗  ██████╔╝███████║   ██║   ██║   ██║██████╔╝[/]
+  [#d06060]╚██╗ ██╔╝██║   ██║██║     ██║╚██╗██║██╔══╝  ██╔══██╗██╔══██║   ██║   ██║   ██║██╔══██╗[/]
+  [#cc7777] ╚████╔╝ ╚██████╔╝███████╗██║ ╚████║███████╗██║  ██║██║  ██║   ██║   ╚██████╔╝██║  ██║[/]
+  [#9aa0ac]  ╚═══╝   ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝[/]
   [bold #00FF41]                                                              — AI —[/]
 
-# ── Banner hero (TUI — left panel art, replaces the caduceus) ─────────────────
-# Crosshair / target-lock motif in braille Unicode art.
+# ── Banner hero ───────────────────────────────────────────────────────────────
 banner_hero: |
-  [#880000]⠀⠀⠀⠀⠀⠀⣤⠀⣤⠀⠀⠀⠀⠀[/]
-  [#AA0000]⠀⠀⠀⠀⢀⣴⣿⠃⣿⣦⡀⠀⠀⠀[/]
-  [#CC0000]⠀⠀⠀⣴⡿⠋⠀⠀⠀⠙⢿⣦⠀⠀[/]
-  [#CC0000]⠀⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⠀[/]
-  [#DD1111]⠸⣿⠀⠀⣿⡄⠀⠀⢠⣿⠀⠀⣿⠇[/]
-  [#EE2222]⠀⣤⠀⠀⠉⠉⠀⠀⠉⠉⠀⠀⣤⠀[/]
-  [#FF3333]⠀⠀⠀⣠⣿⠟⠀⠀⠻⣿⣄⠀⠀⠀[/]
-  [#FF5555]⠀⠀⢀⣾⠏⠀⣤⣤⠀⠸⣷⡀⠀⠀[/]
-  [#FF7777]⠀⠀⠀⠀⠀⠀⢿⡿⠀⠀⠀⠀⠀⠀[/]
-  [dim #AA2222]⠀⠀⠀⠀target locked⠀⠀⠀[/]
+  [#550000]⠀⠀⠀⠀⠀⠀⣤⠀⣤⠀⠀⠀⠀⠀[/]
+  [#770000]⠀⠀⠀⠀⢀⣴⣿⠃⣿⣦⡀⠀⠀⠀[/]
+  [#993333]⠀⠀⠀⣴⡿⠋⠀⠀⠀⠙⢿⣦⠀⠀[/]
+  [#b03a3a]⠀⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⠀[/]
+  [#c75a5a]⠸⣿⠀⠀⣿⡄⠀⠀⢠⣿⠀⠀⣿⠇[/]
+  [#b03a3a]⠀⣤⠀⠀⠉⠉⠀⠀⠉⠉⠀⠀⣤⠀[/]
+  [#993333]⠀⠀⠀⣠⣿⠟⠀⠀⠻⣿⣄⠀⠀⠀[/]
+  [#770000]⠀⠀⢀⣾⠏⠀⣤⣤⠀⠸⣷⡀⠀⠀[/]
+  [#550000]⠀⠀⠀⠀⠀⠀⢿⡿⠀⠀⠀⠀⠀⠀[/]
+  [dim #9aa0ac]⠀⠀⠀⠀target locked⠀⠀⠀[/]
+
+# ── customCSS — Vulnerator-AI theme for the web dashboard (:9119) ─────────────
+# Injects into the Hermes web dashboard while this skin is active.
+# Palette mirrors the landing page (irraz.github.io/vulnerator-ai).
+customCSS: |
+  :root {
+    --hermes-bg:           #0a0a0a;
+    --hermes-bg-deep:      #080b14;
+    --hermes-panel:        #10131c;
+    --hermes-panel-edge:   #1c2130;
+    --hermes-text:         #e6e8ec;
+    --hermes-muted:        #9aa0ac;
+    --hermes-accent:       #b03a3a;
+    --hermes-accent-soft:  #c75a5a;
+    --hermes-green:        #00FF41;
+  }
+  body, html {
+    background: var(--hermes-bg) !important;
+    color: var(--hermes-text) !important;
+    font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace !important;
+  }
+  /* Panels and cards */
+  [class*="panel"], [class*="card"], [class*="sidebar"],
+  [class*="drawer"], [class*="modal"], [class*="dialog"] {
+    background: var(--hermes-panel) !important;
+    border-color: var(--hermes-panel-edge) !important;
+  }
+  /* Links and accents */
+  a { color: var(--hermes-accent-soft) !important; }
+  a:hover { color: var(--hermes-green) !important; }
+  /* Input fields */
+  input, textarea, [role="textbox"] {
+    background: var(--hermes-bg-deep) !important;
+    color: var(--hermes-text) !important;
+    border-color: var(--hermes-panel-edge) !important;
+  }
+  input:focus, textarea:focus {
+    border-color: var(--hermes-accent) !important;
+    outline: none !important;
+  }
+  /* Buttons */
+  button[class*="primary"], [class*="btn-primary"] {
+    background: var(--hermes-accent) !important;
+    border-color: var(--hermes-accent) !important;
+    color: #fff !important;
+  }
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--hermes-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--hermes-accent); border-radius: 3px; }
