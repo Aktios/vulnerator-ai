@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="index, follow">
+  <meta name="googlebot" content="index, follow">
+  <!-- Canonical and SEO: main content is always in the DOM, boot screen is cosmetic only -->
+  <link rel="canonical" href="https://irraz.github.io/vulnerator-ai/">
   <title>Vulnerator AI — Unholy Pentest</title>
   <meta name="description" content="An OODA pentest driven by Hermes talking directly to a Kali container via MCP. Death-metal cyberpunk. offerings to the Kali.">
   <meta name="theme-color" content="#0a0a0a">
@@ -347,7 +351,7 @@
             </div>
             <div class="lab-card__links">
               <a href="https://github.com/irraz/vulnerator-ai/tree/master/labs/looney-tunables-ctf" rel="noopener" target="_blank" class="lab-link">Lab source</a>
-              <a href="pentest-report-example.html" class="lab-link lab-link--report">Sample pentest report &rarr;</a>
+              <a href="pentest-report-example.html" data-drawer="pentest-report-example.html" class="lab-link lab-link--report">Sample pentest report &rarr;</a>
             </div>
           </li>
         </ul>
@@ -373,7 +377,7 @@
               Exploitability demonstrated: 10/10 SIGSEGV on SUID binaries with differential controls.
               OODA loop closed in 14 steps.
             </p>
-            <a href="pentest-report-example.html" class="report-link">View full report &rarr;</a>
+            <a href="pentest-report-example.html" class="report-link" data-drawer="pentest-report-example.html">View full report &rarr;</a>
           </li>
         </ul>
       </div>
@@ -439,7 +443,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
             github.com/irraz/vulnerator-ai
           </a>
-          <a href="pentest-report-example.html" class="footer__link">Sample report</a>
+          <a href="pentest-report-example.html" class="footer__link" data-drawer="pentest-report-example.html">Sample report</a>
           <a href="https://github.com/irraz/vulnerator-ai/blob/master/docs/usage.md" rel="noopener" target="_blank" class="footer__link">Docs</a>
         </div>
       </div>
@@ -447,9 +451,64 @@
     </div>
   </footer>
 
+  <!-- ── Content drawer (same-origin links without leaving the page) ── -->
+  <div id="content-drawer" aria-modal="true" role="dialog" aria-label="Content panel">
+    <div id="drawer-bar">
+      <span id="drawer-title">Report</span>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <a id="drawer-open-tab" href="#" target="_blank" rel="noopener" title="Open in new tab"
+           style="color:var(--muted);font-size:0.75rem;text-decoration:none;font-family:monospace">↗ new tab</a>
+        <button id="drawer-close" aria-label="Close panel">✕</button>
+      </div>
+    </div>
+    <iframe id="drawer-frame" title="Content" sandbox="allow-scripts allow-same-origin"></iframe>
+  </div>
+  <div id="drawer-backdrop"></div>
+
+  <script>
+    // ── Drawer logic ─────────────────────────────────────────────
+    (function () {
+      var drawer   = document.getElementById('content-drawer');
+      var frame    = document.getElementById('drawer-frame');
+      var closeBtn = document.getElementById('drawer-close');
+      var backdrop = document.getElementById('drawer-backdrop');
+      var titleEl  = document.getElementById('drawer-title');
+      var openTab  = document.getElementById('drawer-open-tab');
+
+      function openDrawer(url, label) {
+        frame.src        = url;
+        titleEl.textContent = label || url;
+        openTab.href     = url;
+        drawer.classList.add('drawer--open');
+        backdrop.classList.add('backdrop--on');
+        document.body.classList.add('has-drawer');
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove('drawer--open');
+        backdrop.classList.remove('backdrop--on');
+        document.body.classList.remove('has-drawer');
+        setTimeout(function () { frame.src = 'about:blank'; }, 400);
+      }
+
+      closeBtn.addEventListener('click', closeDrawer);
+      backdrop.addEventListener('click', closeDrawer);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeDrawer();
+      });
+
+      // Intercept all data-drawer links
+      document.addEventListener('click', function (e) {
+        var link = e.target.closest('[data-drawer]');
+        if (!link) return;
+        e.preventDefault();
+        openDrawer(link.dataset.drawer, link.dataset.drawerTitle || link.textContent.trim());
+      });
+    })();
+  </script>
+
   <script>
     // Fetch live GitHub stats (stars + latest release version)
-    (function () {
       function setAll(id, val) {
         document.querySelectorAll(id).forEach(function(el){ el.textContent = val; });
       }

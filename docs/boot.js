@@ -14,31 +14,52 @@
 (() => {
   'use strict';
 
+  // Skip boot entirely for search engine crawlers — preserves SEO/LCP
+  if (/bot|crawl|spider|google|bing|slurp|duckduck|baidu|yandex/i.test(navigator.userAgent)) {
+    const b = document.getElementById('boot');
+    if (b) b.style.display = 'none';
+    document.body.style.overflow = '';
+    if (window.initPostBoot) window.initPostBoot(document.getElementById('site-audio'));
+    return;
+  }
+
   /* ── Boot lines ──────────────────────────────────────────────── */
   const LINES = [
-    { t: 'VULNERATOR SYSTEMS  ·  BIOS v2.04.1',              c: 'd'          },
-    { t: 'RAM check: 65536 KB  OK',                           c: 'd', p: 80  },
-    { t: '',                                                           p: 120  },
-    { t: '▸ Mounting encrypted volumes',           ok: true,  p: 160         },
-    { t: '▸ Loading kernel modules',               ok: true,  p: 120         },
-    { t: '▸ Initialising network stack',           ok: true,  p: 180         },
-    { t: '',                                                           p: 80   },
-    { t: '▸ Establishing secure tunnel',                       p: 60          },
-    { t: '  ├─ TLS 1.3 handshake',                ok: true,  p: 80          },
-    { t: '  ├─ Certificate validation',            ok: true,  p: 60          },
-    { t: '  └─ Tunnel encrypted',                  ok: true,  p: 220         },
-    { t: '',                                                           p: 80   },
-    { t: '▸ Loading VULNERATOR-AI core',                       p: 60          },
-    { t: '  ├─ OODA engine',                       ok: true,  p: 120         },
-    { t: '  ├─ kali-mcp  →  Kali container',       ok: true,  p: 260         },
-    { t: '  ├─ playwright-mcp  →  Chromium',       ok: true,  p: 170         },
-    { t: '  └─ Hermes LLM  →  online',             ok: true,  p: 380         },
-    { t: '',                                                           p: 140  },
-    { t: '  ██  ALL MODULES NOMINAL  ·  SYSTEM ARMED  ██',    c: 'h', p: 200 },
-    { t: '',                                                           p: 80   },
+    // ── Hardware ─────────────────────────────────────────────────
+    { t: 'VULNERATOR-AI SYSTEMS  ·  BIOS v2.04.1',                   c: 'd', p: 20  },
+    { t: 'POST: RAM SCAN ████████████████████ 65536 KB — CLEAN',      c: 'd', p: 40  },
+    { t: '',                                                                   p: 50  },
+    // ── Threat detection ─────────────────────────────────────────
+    { t: '⚠  INTRUSION DETECTED  ·  SRC 172.16.8.14:4444',                   p: 120 },
+    { t: '   COUNTERMEASURES: ACTIVE',                                         p: 40  },
+    { t: '   ORIGIN TRACE: REDIRECTED → /dev/null',           ok: true,       p: 140 },
+    { t: '',                                                                   p: 40  },
+    // ── Core modules ─────────────────────────────────────────────
+    { t: '▸ Mounting encrypted volumes',               ok: true,              p: 80  },
+    { t: '▸ Loading kernel modules',                   ok: true,              p: 60  },
+    { t: '▸ Initialising network stack',               ok: true,              p: 80  },
+    { t: '',                                                                   p: 40  },
+    { t: '▸ Establishing secure tunnel',                                       p: 30  },
+    { t: '  ├─ TLS 1.3 handshake',                     ok: true,              p: 40  },
+    { t: '  ├─ Certificate validation',                 ok: true,              p: 30  },
+    { t: '  └─ AES-256-GCM channel encrypted',         ok: true,              p: 120 },
+    { t: '',                                                                   p: 40  },
+    { t: '▸ Loading VULNERATOR-AI core',                                       p: 30  },
+    { t: '  ├─ OODA engine  ·  Mistral Large 4.0',     ok: true,              p: 60  },
+    { t: '  ├─ kali-mcp  →  Kali container',           ok: true,              p: 140 },
+    { t: '  ├─ playwright-mcp  →  Chromium',           ok: true,              p: 90  },
+    { t: '  └─ Hermes LLM  →  online',                 ok: true,              p: 200 },
+    { t: '',                                                                   p: 60  },
+    // ── Authorization ────────────────────────────────────────────
+    { t: '  SCOPE · AUTHORIZED TARGETS ONLY',                                 p: 40  },
+    { t: '  OPERATOR CLEARANCE  ·  ████████████  ·  VERIFIED', ok: true,      p: 140 },
+    { t: '',                                                                   p: 80  },
+    // ── Armed ────────────────────────────────────────────────────
+    { t: '  ██  TARGET ACQUIRED  ·  KALI UNLEASHED  ██',       c: 'h', p: 120 },
+    { t: '',                                                                   p: 60  },
   ];
 
-  const CHAR_MS = 14;
+  const CHAR_MS = 5;
 
   /* ── DOM refs ─────────────────────────────────────────────────── */
   const boot   = document.getElementById('boot');
@@ -49,6 +70,11 @@
   const ctrl   = document.getElementById('audio-ctrl');
   const btTurb = document.getElementById('bt-turb');
   const btDisp = document.getElementById('bt-disp');
+
+  // Inject CRT sweep line into the screen area
+  const sweep = document.createElement('div');
+  sweep.className = 'crt-sweep';
+  document.querySelector('.boot__inner').prepend(sweep);
 
   let dismissed = false;
   let dispRaf   = null;
@@ -270,9 +296,10 @@
 
   async function typeLine(text, cls, showOk) {
     const el = document.createElement('div');
-    el.className = 'bl' + (cls ? ' bl--' + cls : '');
+    el.className = 'bl' + (cls ? ' bl--' + cls : '') + ' bl--new bl--typing';
     out.appendChild(el);
     el.scrollIntoView({ block: 'nearest' });
+    setTimeout(() => el.classList.remove('bl--new'), 120);
 
     let clickAt = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i <= text.length; i++) {
@@ -282,18 +309,30 @@
         sfx.typeClick();
         clickAt = 3 + Math.floor(Math.random() * 3);
       }
-      await sleep(CHAR_MS + Math.random() * 10 - 5);
+      await sleep(CHAR_MS + Math.random() * 8 - 4);
     }
+
+    el.classList.remove('bl--typing');
 
     if (showOk) {
       const sp = document.createElement('span');
-      sp.className = 'bl__ok';
-      sp.textContent = ' [OK]';
+      sp.style.cssText = 'color:#5ab870;margin-left:0.4em';
       el.appendChild(sp);
-      el.scrollIntoView({ block: 'nearest' });
+
+      // Spinner frames
+      const FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+      let fi = 0;
+      sp.textContent = FRAMES[0];
+      const spin = setInterval(() => { sp.textContent = FRAMES[fi++ % FRAMES.length]; }, 55);
+
+      await sleep(380 + Math.random() * 340);
+      clearInterval(spin);
+      sp.textContent = '[OK]';
+      sp.className = 'bl__ok';
       sfx.diskSeek();
     }
 
+    el.scrollIntoView({ block: 'nearest' });
     if (cls === 'h') setTimeout(() => sfx.readyChime(), 100);
   }
 
@@ -319,6 +358,11 @@
   }
 
   function showPrompt() {
+    // Blinking cursor on last text line
+    const lines = out.querySelectorAll('.bl');
+    const last = lines[lines.length - 1];
+    if (last) last.classList.add('bl--cursor');
+
     prompt.style.display = 'block';
     prompt.scrollIntoView({ block: 'nearest' });
   }
