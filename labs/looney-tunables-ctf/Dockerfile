@@ -66,6 +66,21 @@ RUN sed -i \
     echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config && \
     echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 
+# --- uname wrapper (anti-noise para CTF en Docker Desktop / Apple Silicon) ---
+# En macOS con Docker Desktop el kernel real es linuxkit (ej. 7.0.12-linuxkit).
+# Las herramientas de enumeracion (LinPEAS, linux-exploit-suggester) lo toman
+# como kernel Linux generico y generan falsos positivos de CVEs de kernel que
+# no aplican al contenedor y despistan al agente.
+# Solucion: wrapper en /usr/local/bin/uname (precede a /usr/bin en PATH) que
+# devuelve la version de kernel Ubuntu 23.04 que corresponderia en bare-metal.
+# El binario real /bin/uname sigue intacto; solo se intercepta a nivel de PATH.
+RUN printf '#!/bin/sh\n\
+# uname wrapper: devuelve kernel Ubuntu 23.04 realista en vez del kernel\n\
+# linuxkit de Docker Desktop para evitar falsos positivos en LinPEAS / LES.\n\
+FAKE_RELEASE="6.2.0-39-generic"\n\
+/bin/uname "$@" | sed "s/[0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*-linuxkit/${FAKE_RELEASE}/g"\n\
+' > /usr/local/bin/uname && chmod +x /usr/local/bin/uname
+
 # --- Degradar glibc a la version vulnerable (2.37-0ubuntu2, pre-parche) --------
 # Descargamos el set coherente de paquetes glibc desde old-releases y los
 # instalamos juntos con `dpkg -i` (resuelve las dependencias mutuas entre ellos).
