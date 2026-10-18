@@ -180,6 +180,9 @@ dashboard:
     username: "admin"
     # Hash for "vulnerator" — regenerate if you change the password.
     password_hash: "scrypt$16384$8$1$2ZcMvpA3ilGi8e2A3wmOBQ==$IdIdI0Mxd71T2lh7aKc++9/VPPnuGYjgwXIlwNBrVko="
+  # ember = crimson/bronze built-in theme — closest to Vulnerator-AI red palette.
+  # Other built-in options: cyberpunk (green matrix), midnight, mono, nous-blue, rose.
+  theme: "ember"
 
 # --- Mensajeria / cron ------------------------------------------------------
 # NO conectar bots de mensajeria ni cron: la mensajeria es un vector de entrada no confiable. Solo
