@@ -45,7 +45,7 @@
   <text x="40" y="84" fill="#8a8a8a" font-size="13" letter-spacing="2">
     SYSTEM ARCHITECTURE &#183; OODA pentest driven by Hermes &#183; piloted over HTTP from an external assistant</text>
   <text x="40" y="104" fill="#5a5a5a" font-size="11" letter-spacing="1">
-    no core &#183; no REST facade &#183; no UI &#183; no scope-gate &#8212; the agent drives tools over MCP (an MCP front door ships by default)</text>
+    no core &#183; no REST facade &#183; no UI &#183; no scope-gate &#8212; the agent drives tools end to end over MCP</text>
   <line x1="40" y1="116" x2="1440" y2="116" stroke="#2f2f2f" stroke-width="1"/>
 
   <!-- ===================== OPERATOR COLUMN ===================== -->
@@ -200,22 +200,6 @@
   <text x="930" y="832" fill="#b03a3a" font-size="9" text-anchor="middle">"which tactic comes next?"</text>
   <path d="M930,836 L930,842" fill="none" stroke="#b03a3a" stroke-width="1.3" marker-end="url(#aLoop)"/>
 
-  <!-- ===================== VULNERATOR-MCP (default MCP front door) ===================== -->
-  <rect x="36" y="800" width="638" height="150" rx="6" fill="#0a0a0a" stroke="#9a9a9a" stroke-width="1.6"/>
-  <text x="54" y="826" fill="#f2f2f2" font-size="13.5" font-weight="700" letter-spacing="1">[&#8734;] VULNERATOR-MCP &#8212; MCP FRONT DOOR (4th container, default)</text>
-  <text x="54" y="844" fill="#8a8a8a" font-size="10">in docker-compose.yml &#183; up by default &#183; wraps the :8642 runs API as MCP tools</text>
-  <rect x="54" y="856" width="602" height="54" rx="4" fill="#101010" stroke="#9a9a9a" stroke-width="1.3"/>
-  <text x="70" y="878" fill="#e8e8e8" font-size="12" font-weight="700">[&#8734;] streamable-HTTP &#183; :8700 (internal; no host port by default)</text>
-  <text x="70" y="896" fill="#8a8a8a" font-size="9.5">trigger / observe / steer / stop ONLY &#183; no raw kali_run &#183; mandatory inbound Bearer (fail-closed)</text>
-  <text x="54" y="930" fill="#6a6a6a" font-size="9">stdio mode for local Claude Code / Kiro (zero network surface, no token) &#183; two tokens / two trust boundaries</text>
-
-  <!-- MCP client -> vulnerator-mcp (inbound Bearer) -->
-  <path d="M161,424 C161,620 220,800 300,800" fill="none" stroke="#e8e8e8" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aReq)"/>
-  <text x="150" y="640" fill="#cfcfcf" font-size="9" text-anchor="middle" transform="rotate(90 150 640)">MCP &#183; inbound Bearer (VULNERATOR_MCP_INBOUND_TOKEN)</text>
-  <!-- vulnerator-mcp -> :8642 (upstream Bearer) -->
-  <path d="M674,856 C700,820 500,360 500,348" fill="none" stroke="#e8e8e8" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aReq)"/>
-  <text x="648" y="700" fill="#8a8a8a" font-size="9" text-anchor="middle" transform="rotate(-78 648 700)">wraps :8642 &#183; upstream Bearer (HERMES_API_SERVER_KEY)</text>
-
   <!-- ===================== FLOWS ===================== -->
   <!-- assistant -> API (request) -->
   <path d="M262,330 C300,330 300,312 366,312" fill="none" stroke="#e8e8e8" stroke-width="2.4" marker-end="url(#aReq)"/>
@@ -259,11 +243,10 @@
   <text x="54" y="628" fill="#cfcfcf" font-size="9.5">:8642  Hermes API (Bearer)</text>
   <text x="54" y="644" fill="#cfcfcf" font-size="9.5">:8900  kali-mcp</text>
   <text x="54" y="660" fill="#cfcfcf" font-size="9.5">:8901  artifacts data-plane</text>
-  <text x="54" y="675" fill="#7f8c8d" font-size="9">:8931  playwright (internal only)</text>
-  <text x="54" y="689" fill="#7f8c8d" font-size="9">:8700  vulnerator-mcp (default; internal only)</text>
+  <text x="54" y="676" fill="#7f8c8d" font-size="9.5">:8931  playwright (internal only)</text>
 
-  <line x1="54" y1="700" x2="286" y2="700" stroke="#2f2f2f"/>
-  <text x="54" y="717" fill="#8a8a8a" font-size="9">assistant triggers &#183; Hermes reasons the OODA</text>
-  <text x="54" y="731" fill="#8a8a8a" font-size="9">kali executes &#183; findings are evidence-first</text>
-  <text x="54" y="746" fill="#5a5a5a" font-size="8.5">&#8224; summoned from the depths of the OODA abyss &#8224;</text>
+  <line x1="54" y1="690" x2="286" y2="690" stroke="#2f2f2f"/>
+  <text x="54" y="710" fill="#8a8a8a" font-size="9">assistant triggers &#183; Hermes reasons the OODA</text>
+  <text x="54" y="724" fill="#8a8a8a" font-size="9">kali executes &#183; findings are evidence-first</text>
+  <text x="54" y="740" fill="#5a5a5a" font-size="8.5">&#8224; summoned from the depths of the OODA abyss &#8224;</text>
 </svg>
