@@ -350,8 +350,34 @@
               <span>ASLR level 2</span>
             </div>
             <div class="lab-card__links">
+              <a href="https://github.com/irraz/vulnerator-ai/blob/master/labs/looney-tunables-ctf/README.md" rel="noopener" target="_blank" class="lab-link">README</a>
               <a href="https://github.com/irraz/vulnerator-ai/tree/master/labs/looney-tunables-ctf" rel="noopener" target="_blank" class="lab-link">Lab source</a>
               <a href="pentest-report-example.html" data-drawer="pentest-report-example.html" class="lab-link lab-link--report">Sample pentest report &rarr;</a>
+            </div>
+          </li>
+          <li class="lab-card">
+            <div class="lab-card__header">
+              <span class="lab-card__tag">WEB</span>
+              <span class="lab-card__tag lab-card__tag--red">SSTI &rarr; RCE</span>
+              <span class="lab-card__tag lab-card__tag--dim">Docker</span>
+            </div>
+            <h3 class="lab-card__name">pinguinazo-ssti</h3>
+            <p class="lab-card__body">
+              Flask/Jinja2 web application with unsanitised template input. The agent must discover
+              the server-side template injection, obtain remote code execution, establish a reverse
+              shell to Kali, and escalate with <code>sudo java</code> to capture the root flag.
+            </p>
+            <div class="lab-card__meta">
+              <span>Flask / Werkzeug 3.1.9</span>
+              <span>&middot;</span>
+              <span>Web service · port 5000</span>
+              <span>&middot;</span>
+              <span>Reverse shell + sudo java</span>
+            </div>
+            <div class="lab-card__links">
+              <a href="https://github.com/irraz/vulnerator-ai/blob/master/labs/pinguinazo-ssti/README.md" rel="noopener" target="_blank" class="lab-link">README</a>
+              <a href="https://github.com/irraz/vulnerator-ai/tree/master/labs/pinguinazo-ssti" rel="noopener" target="_blank" class="lab-link">Lab source</a>
+              <a href="pinguinazo-report-example.html" data-drawer="pinguinazo-report-example.html" class="lab-link lab-link--report">Sample CTF report &rarr;</a>
             </div>
           </li>
         </ul>

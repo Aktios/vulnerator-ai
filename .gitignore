@@ -36,6 +36,9 @@ profiles/
 state.db
 state.db-*
 
+# --- Ruido de macOS ---
+.DS_Store
+
 # --- Artefactos de Python / pytest (ruido de build, no fuente) ---
 __pycache__/
 *.py[cod]

@@ -1,183 +1,116 @@
 # vulnerator.yaml — custom Hermes skin for the Vulnerator-AI OODA pentest engine.
-# Palette aligned with the Vulnerator-AI landing page (irraz.github.io/vulnerator-ai).
-# Loaded by Hermes skin_engine from <hermes_home>/skins/vulnerator.yaml.
-# Activated via `display.skin: vulnerator` in config.yaml.
-# Copied from agent-ooda/profile/skins/ to /opt/data/skins/ by the
-# docker-compose ooda-agent startup script on every container boot.
+# Palette and visual language aligned with the README and landing page.
+# Loaded from <hermes_home>/skins/vulnerator.yaml and activated via
+# `display.skin: vulnerator` in config.yaml.
 
 name: "vulnerator"
-description: "Vulnerator-AI OODA engine — dark red / cyber theme (aligned with landing page)"
+description: "Vulnerator-AI — unholy pentest / OODA terminal skin"
 
 # ── Branding ──────────────────────────────────────────────────────────────────
 branding:
   agent_name: "Vulnerator-AI"
-  welcome: "Vulnerator-AI OODA engine online. Define your target and engage."
-  goodbye: "Engagement terminated. ⚡"
-  response_label: " ⚡ Vulnerator-AI "
-  prompt_symbol: "⚡"
-  help_header: "(⚡) Available Commands"
+  welcome: "UNHOLY PENTEST // OODA engine online. Declare authorized target and mode."
+  goodbye: "Engagement sealed. Evidence persists."
+  response_label: " VULNERATOR // OODA "
+  prompt_symbol: "V>"
+  help_header: "VULNERATOR // COMMAND INDEX"
 
-# ── Colors — aligned with landing page palette ────────────────────────────────
-# Landing page variables for reference:
-#   --bg: #0a0a0a  --bg-deep: #080b14  --panel: #10131c  --panel-edge: #1c2130
-#   --text: #e6e8ec  --muted: #9aa0ac  --accent: #b03a3a  --accent-soft: #c75a5a
+# ── Colors — landing-page palette ─────────────────────────────────────────────
+# Metal and dark red carry the identity. Matrix green is reserved for confirmed
+# success and live/armed state rather than used as a general brand color.
 colors:
-  # Banner
-  banner_border:                 "#b03a3a"   # landing --accent
-  banner_title:                  "#00FF41"   # matrix green — pentest identity
-  banner_accent:                 "#c75a5a"   # landing --accent-soft
-  banner_dim:                    "#663333"
-  banner_text:                   "#e6e8ec"   # landing --text
+  banner_border:                   "#b03a3a"
+  banner_title:                    "#c75a5a"
+  banner_accent:                   "#c75a5a"
+  banner_dim:                      "#663333"
+  banner_text:                     "#e6e8ec"
 
-  # UI
-  ui_accent:                     "#c75a5a"   # landing --accent-soft
-  ui_label:                      "#9aa0ac"   # landing --muted
-  ui_ok:                         "#00FF41"   # matrix green for success
-  ui_error:                      "#ef5350"
-  ui_warn:                       "#ffa726"
+  ui_accent:                       "#c75a5a"
+  ui_label:                        "#9aa0ac"
+  ui_ok:                           "#00FF41"
+  ui_error:                        "#ef5350"
+  ui_warn:                         "#ffa726"
 
-  # Input / prompt
-  prompt:                        "#e6e8ec"   # landing --text
-  input_rule:                    "#b03a3a"   # landing --accent
+  prompt:                          "#e6e8ec"
+  input_rule:                      "#b03a3a"
+  response_border:                 "#c75a5a"
 
-  # Response
-  response_border:               "#c75a5a"   # landing --accent-soft
+  status_bar_bg:                   "#080b14"
+  status_bar_text:                 "#9aa0ac"
+  status_bar_strong:               "#c75a5a"
+  status_bar_dim:                  "#1c2130"
+  status_bar_good:                 "#00FF41"
+  status_bar_warn:                 "#ffa726"
+  status_bar_bad:                  "#c75a5a"
+  status_bar_critical:             "#b03a3a"
 
-  # Status bar — deep space blue-black from landing
-  status_bar_bg:                 "#080b14"   # landing --bg-deep
-  status_bar_text:               "#9aa0ac"   # landing --muted
-  status_bar_strong:             "#00FF41"
-  status_bar_dim:                "#1c2130"   # landing --panel-edge
-  status_bar_good:               "#00FF41"
-  status_bar_warn:               "#ffa726"
-  status_bar_bad:                "#c75a5a"
-  status_bar_critical:           "#b03a3a"
+  session_label:                   "#c75a5a"
+  session_border:                  "#1c2130"
 
-  # Sessions
-  session_label:                 "#c75a5a"
-  session_border:                "#1c2130"   # landing --panel-edge
+  completion_menu_bg:              "#0a0a0a"
+  completion_menu_current_bg:      "#10131c"
+  completion_menu_meta_bg:         "#080b14"
+  completion_menu_meta_current_bg: "#1c2130"
 
-  # Completion menu — landing panel tones
-  completion_menu_bg:            "#0a0a0a"   # landing --bg
-  completion_menu_current_bg:    "#10131c"   # landing --panel
-  completion_menu_meta_bg:       "#080b14"   # landing --bg-deep
-  completion_menu_meta_current_bg: "#1c2130" # landing --panel-edge
+  selection_bg:                    "#10131c"
+  shell_dollar:                    "#00FF41"
+  voice_status_bg:                 "#080b14"
 
-  # Selection / shell
-  selection_bg:                  "#10131c"   # landing --panel
-  shell_dollar:                  "#00FF41"
-  voice_status_bg:               "#080b14"   # landing --bg-deep
-
-# ── Spinner ───────────────────────────────────────────────────────────────────
+# ── Spinner — truthful OODA state language ────────────────────────────────────
 spinner:
   thinking_verbs:
-    - "scanning"
-    - "enumerating"
-    - "exploiting"
-    - "pivoting"
-    - "exfiltrating"
+    - "observing surface"
+    - "orienting evidence"
+    - "deciding next action"
+    - "correlating findings"
     - "mapping attack surface"
-    - "probing defenses"
-    - "chaining vectors"
-    - "escalating privileges"
-    - "persisting access"
+    - "verifying evidence"
   thinking_faces:
-    - "(⚡)"
-    - "(⚠)"
-    - "(▶)"
-    - "(◎)"
-    - "(⟳)"
+    - "[O]"
+    - "[O]"
+    - "[D]"
+    - "[A]"
   waiting_faces:
-    - "(⚡)"
-    - "(▶)"
-    - "(◎)"
-    - "(⟳)"
+    - "[·]"
+    - "[•]"
+    - "[●]"
+    - "[•]"
   wings:
-    - ["⟪⚡", "⚡⟫"]
-    - ["⟪▶", "◀⟫"]
-    - ["⟪◎", "◎⟫"]
+    - ["⟦", "⟧"]
+    - ["╾", "╼"]
 
 tool_prefix: "▸"
 
-# ── Tool emojis — per-tool overrides ─────────────────────────────────────────
+# MCP tools are registered with their fully qualified runtime names. Symbols are
+# monochrome and single-cell where possible so activity lines stay aligned.
 tool_emojis:
-  kali_run:       "⚔"
-  kali_exec:      "⚡"
-  record_finding: "📌"
-  read_findings:  "📋"
-  kali_run_async: "⚡"
+  mcp__kali__kali_run:       "▶"
+  mcp__kali__kali_exec:      "▷"
+  mcp__kali__record_finding: "◆"
+  mcp__kali__read_findings:  "◇"
 
 # ── Banner logo ───────────────────────────────────────────────────────────────
+# Preserve the readable 86-cell wordmark; use metallic faces with red shadowing
+# to echo the README logo without sacrificing terminal legibility.
 banner_logo: |
   [bold #b03a3a]██╗   ██╗██╗   ██╗██╗     ███╗   ██╗███████╗██████╗  █████╗ ████████╗ ██████╗ ██████╗ [/]
-  [bold #c04040]██║   ██║██║   ██║██║     ████╗  ██║██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗[/]
-  [#c75a5a]██║   ██║██║   ██║██║     ██╔██╗ ██║█████╗  ██████╔╝███████║   ██║   ██║   ██║██████╔╝[/]
-  [#d06060]╚██╗ ██╔╝██║   ██║██║     ██║╚██╗██║██╔══╝  ██╔══██╗██╔══██║   ██║   ██║   ██║██╔══██╗[/]
-  [#cc7777] ╚████╔╝ ╚██████╔╝███████╗██║ ╚████║███████╗██║  ██║██║  ██║   ██║   ╚██████╔╝██║  ██║[/]
-  [#9aa0ac]  ╚═══╝   ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝[/]
-  [bold #00FF41]                                                              — AI —[/]
+  [bold #9aa0ac]██║   ██║██║   ██║██║     ████╗  ██║██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗[/]
+  [bold #e6e8ec]██║   ██║██║   ██║██║     ██╔██╗ ██║█████╗  ██████╔╝███████║   ██║   ██║   ██║██████╔╝[/]
+  [bold #e6e8ec]╚██╗ ██╔╝██║   ██║██║     ██║╚██╗██║██╔══╝  ██╔══██╗██╔══██║   ██║   ██║   ██║██╔══██╗[/]
+  [bold #c75a5a] ╚████╔╝ ╚██████╔╝███████╗██║ ╚████║███████╗██║  ██║██║  ██║   ██║   ╚██████╔╝██║  ██║[/]
+  [#663333]  ╚═══╝   ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝[/]
+  [bold #9aa0ac]                                              UNHOLY PENTEST // OODA ENGINE[/]
 
 # ── Banner hero ───────────────────────────────────────────────────────────────
-# Clean targeting reticle — simple shapes read better at small TUI size
+# Neural OODA reliquary: compact circuit/brain motif derived from the graphic
+# identity instead of a generic military reticle. Green appears once as state.
 banner_hero: |
-  [dim #440000]⠀⠀⠀⠀⠀⠀⠸⠿⠇⠀⠀⠀⠀⠀[/]
-  [#660000]⠀⠀⠀⠀⠀⠀⢸⠀⡇⠀⠀⠀⠀⠀[/]
-  [#883333]⠀⠀⢀⣠⠤⠤⢸⠀⡇⠤⠤⣄⡀⠀[/]
-  [#b03a3a]⠀⢰⡟⠀⠀⠀⢸⠀⡇⠀⠀⠀⢻⡆[/]
-  [#c75a5a]⠀⣾⠁⠀⡤⠤⠼⠀⠧⠤⢤⠀⠈⣷[/]
-  [#c75a5a]⠀⣿⠀⠀⡇⠀⠀⠀⠀⠀⢸⠀⠀⣿[/]
-  [#b03a3a]⠀⢿⡄⠀⠓⠒⠒⠒⠒⠒⠚⠀⣠⡿[/]
-  [#883333]⠀⠀⠻⣦⡀⠀⠀⠀⠀⠀⢀⣴⠟⠀[/]
-  [#660000]⠀⠀⠀⠀⠀⠀⢸⠀⡇⠀⠀⠀⠀⠀[/]
-  [dim #440000]⠀⠀⠀⠀⠀⠀⠸⠿⠇⠀⠀⠀⠀⠀[/]
-  [dim #9aa0ac]⠀⠀⠀target locked⠀⠀⠀[/]
-
-# ── customCSS — Vulnerator-AI theme for the web dashboard (:9119) ─────────────
-# Injects into the Hermes web dashboard while this skin is active.
-# Palette mirrors the landing page (irraz.github.io/vulnerator-ai).
-customCSS: |
-  :root {
-    --hermes-bg:           #0a0a0a;
-    --hermes-bg-deep:      #080b14;
-    --hermes-panel:        #10131c;
-    --hermes-panel-edge:   #1c2130;
-    --hermes-text:         #e6e8ec;
-    --hermes-muted:        #9aa0ac;
-    --hermes-accent:       #b03a3a;
-    --hermes-accent-soft:  #c75a5a;
-    --hermes-green:        #00FF41;
-  }
-  body, html {
-    background: var(--hermes-bg) !important;
-    color: var(--hermes-text) !important;
-    font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace !important;
-  }
-  /* Panels and cards */
-  [class*="panel"], [class*="card"], [class*="sidebar"],
-  [class*="drawer"], [class*="modal"], [class*="dialog"] {
-    background: var(--hermes-panel) !important;
-    border-color: var(--hermes-panel-edge) !important;
-  }
-  /* Links and accents */
-  a { color: var(--hermes-accent-soft) !important; }
-  a:hover { color: var(--hermes-green) !important; }
-  /* Input fields */
-  input, textarea, [role="textbox"] {
-    background: var(--hermes-bg-deep) !important;
-    color: var(--hermes-text) !important;
-    border-color: var(--hermes-panel-edge) !important;
-  }
-  input:focus, textarea:focus {
-    border-color: var(--hermes-accent) !important;
-    outline: none !important;
-  }
-  /* Buttons */
-  button[class*="primary"], [class*="btn-primary"] {
-    background: var(--hermes-accent) !important;
-    border-color: var(--hermes-accent) !important;
-    color: #fff !important;
-  }
-  /* Scrollbars */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--hermes-bg); }
-  ::-webkit-scrollbar-thumb { background: var(--hermes-accent); border-radius: 3px; }
+  [dim #663333]       ╱│╲       [/]
+  [#9aa0ac]    ╭──●──●──╮    [/]
+  [bold #e6e8ec]  ╭─┤  OODA  ├─╮  [/]
+  [#c75a5a]  │ ╰──┬─┬──╯ │  [/]
+  [bold #b03a3a]  ●────┤ ├────●  [/]
+  [#9aa0ac]       │ │       [/]
+  [#c75a5a]     ╭─┴─┴─╮     [/]
+  [bold #e6e8ec]     ╰─KALI─╯     [/]
+  [bold #00FF41]   OODA // ARMED   [/]
