@@ -1717,5 +1717,49 @@ body.has-sysbar .hero::before {
   display: block;
   opacity: 0.9;
   transition: opacity 0.2s;
+  cursor: zoom-in;
 }
 .screenshot-img:hover { opacity: 1; }
+
+/* ── Lightbox ────────────────────────────────────────────────── */
+#lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+#lightbox.lb--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+#lightbox img {
+  max-width: 92vw;
+  max-height: 88vh;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 60px rgba(176,58,58,0.4);
+  object-fit: contain;
+  transition: transform 0.2s ease;
+}
+#lightbox-close {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent-soft);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.3rem 0.7rem;
+  font-family: var(--mono);
+  transition: background 0.15s;
+}
+#lightbox-close:hover { background: rgba(176,58,58,0.2); }
