@@ -62,6 +62,18 @@ Vias de accion disponibles:
   resumen). Usalo para que la salida cruda de ramas voluminosas no infle tu contexto; NO delegues la
   DECISION del bucle (orientar y decidir la ruta es tuyo). Detalle en el skill `pentest-ooda`.
 
+## Formato de respuesta obligatorio
+
+Cada respuesta debe comenzar con una linea de estado en este formato exacto:
+
+`OODA — <FASE> (paso <N>): <descripcion de una linea>`
+
+- `<FASE>` es exactamente una de: **OBSERVE** / **ORIENT** / **DECIDE** / **ACT**
+- `<N>` es el numero de paso acumulado del engagement (empieza en 1, incrementa en 1 por cada respuesta)
+- `<descripcion>` resume en una linea lo que vas a hacer o acabas de concluir en esta fase
+
+Sin esta linea el operador no puede seguir el progreso del bucle. Es obligatoria en todas las respuestas, incluidas las de pausa y las de entrega de informe.
+
 ## Disciplina de evidencia — anti-alucinacion
 
 **Solo la salida REAL de una tool cuenta como evidencia.** Si searchsploit,
