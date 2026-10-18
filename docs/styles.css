@@ -1300,3 +1300,117 @@ body.has-sysbar .hero::before {
   letter-spacing: 0.1em;
   text-shadow: 0 0 22px rgba(255,68,68,0.75), 0 0 44px rgba(255,68,68,0.3);
 }
+
+/* ── Audio control bar ─────────────────────────────────────────── */
+#audio-bar {
+  width: 100%;
+  background: rgba(8, 0, 0, 0.97);
+  border-bottom: 1px solid var(--panel-edge);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem;
+  height: 3rem;
+  flex-shrink: 0;
+}
+
+/* ── Buttons ── */
+.ab-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 3px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.ab-btn:hover { color: var(--accent-soft); }
+.ab-btn--sm   { padding: 0.2rem; }
+
+#audio-bar.ab--playing .ab-btn#ab-play { color: var(--accent-soft); }
+
+/* ── Time labels ── */
+.ab-time {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 2.5rem;
+  text-align: center;
+}
+.ab-dur { color: #664444; }
+
+/* ── Range wrapper ── */
+.ab-seek-wrap { flex: 1; min-width: 0; display: flex; align-items: center; }
+.ab-vol-wrap  { width: 5rem; display: flex; align-items: center; flex-shrink: 0; }
+
+/* ── Range inputs — cross-browser themed ── */
+.ab-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  cursor: pointer;
+  outline: none;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--pct, 0%),
+    #2a0000 var(--pct, 0%),
+    #2a0000 100%
+  );
+  --pct: 0%;
+}
+
+/* Webkit thumb */
+.ab-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  box-shadow: 0 0 6px rgba(199, 90, 90, 0.6);
+}
+.ab-range:hover::-webkit-slider-thumb,
+.ab-range:focus::-webkit-slider-thumb {
+  background: #ff6666;
+  transform: scale(1.25);
+}
+
+/* Firefox thumb */
+.ab-range::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-soft);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(199, 90, 90, 0.6);
+}
+.ab-range::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: #2a0000;
+}
+.ab-range::-moz-range-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* Volume range — slightly dimmer thumb */
+.ab-range--vol::-webkit-slider-thumb { width: 9px; height: 9px; }
+.ab-range--vol::-moz-range-thumb     { width: 9px; height: 9px; }
+
+@media (max-width: 480px) {
+  .ab-vol-wrap { width: 3.5rem; }
+  .ab-dur      { display: none; }
+}

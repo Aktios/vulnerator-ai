@@ -11,6 +11,7 @@ window.initPostBoot = function (audioEl) {
   initToasts();
   initVisualizer(audioEl);
   initKaraoke(audioEl);
+  initAudioControls(audioEl);
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -392,4 +393,138 @@ function initKaraoke(audioEl) {
 
     audioEl.addEventListener('seeked', () => { lastIdx = -1; });
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUDIO CONTROLS BAR — play/pause · seek · time · volume
+   Inserted below the karaoke zone in normal document flow.
+   Hides the corner mute button (superseded by inline volume).
+═══════════════════════════════════════════════════════════════ */
+function initAudioControls(audioEl) {
+  if (!audioEl) return;
+
+  // Hide the corner mute button — volume is now in the bar
+  var cornerCtrl = document.getElementById('audio-ctrl');
+  if (cornerCtrl) cornerCtrl.style.display = 'none';
+
+  // ── Build the bar ──────────────────────────────────────────────
+  var bar = document.createElement('div');
+  bar.id = 'audio-bar';
+  bar.setAttribute('role', 'region');
+  bar.setAttribute('aria-label', 'Audio player controls');
+
+  bar.innerHTML =
+    // Play / pause
+    '<button id="ab-play" class="ab-btn" aria-label="Play / pause">' +
+      '<svg id="ab-icon-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>' +
+      '<svg id="ab-icon-pause" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>' +
+    '</button>' +
+    // Time current
+    '<span id="ab-time" class="ab-time">0:00</span>' +
+    // Seek bar
+    '<div class="ab-seek-wrap">' +
+      '<input id="ab-seek" class="ab-range" type="range" min="0" max="100" value="0" step="0.1" aria-label="Seek">' +
+    '</div>' +
+    // Duration
+    '<span id="ab-dur" class="ab-time ab-dur">—:——</span>' +
+    // Volume icon
+    '<button id="ab-mute" class="ab-btn ab-btn--sm" aria-label="Mute / unmute">' +
+      '<svg id="ab-vol-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>' +
+    '</button>' +
+    // Volume slider
+    '<div class="ab-vol-wrap">' +
+      '<input id="ab-vol" class="ab-range ab-range--vol" type="range" min="0" max="1" value="0.4" step="0.01" aria-label="Volume">' +
+    '</div>';
+
+  // Insert after karaoke zone, or after visualizer
+  var anchor = document.getElementById('karaoke-zone') || document.getElementById('visualizer');
+  if (anchor) anchor.insertAdjacentElement('afterend', bar);
+  else document.body.appendChild(bar);
+
+  // ── Element refs ───────────────────────────────────────────────
+  var playBtn   = document.getElementById('ab-play');
+  var iconPlay  = document.getElementById('ab-icon-play');
+  var iconPause = document.getElementById('ab-icon-pause');
+  var timeEl    = document.getElementById('ab-time');
+  var durEl     = document.getElementById('ab-dur');
+  var seekEl    = document.getElementById('ab-seek');
+  var muteBtn   = document.getElementById('ab-mute');
+  var volEl     = document.getElementById('ab-vol');
+  var volIcon   = document.getElementById('ab-vol-icon');
+
+  // ── Helpers ───────────────────────────────────────────────────
+  var MUTE_SVG = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+  var SPK_SVG  = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+
+  function fmt(s) {
+    s = Math.max(0, Math.floor(s));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function updatePlayIcon() {
+    var paused = audioEl.paused;
+    iconPlay.style.display  = paused  ? '' : 'none';
+    iconPause.style.display = !paused ? '' : 'none';
+    bar.classList.toggle('ab--playing', !paused);
+  }
+
+  function updateVolIcon() {
+    volIcon.innerHTML = audioEl.muted || audioEl.volume === 0 ? MUTE_SVG : SPK_SVG;
+  }
+
+  // ── Wire events ───────────────────────────────────────────────
+  // Play / pause
+  playBtn.addEventListener('click', function () {
+    if (audioEl.paused) audioEl.play().catch(function(){});
+    else audioEl.pause();
+  });
+
+  // Seek
+  var seeking = false;
+  seekEl.addEventListener('mousedown',  function(){ seeking = true; });
+  seekEl.addEventListener('touchstart', function(){ seeking = true; }, { passive: true });
+  seekEl.addEventListener('input', function () {
+    if (audioEl.duration) audioEl.currentTime = (seekEl.value / 100) * audioEl.duration;
+  });
+  seekEl.addEventListener('change', function () { seeking = false; });
+
+  // Volume
+  volEl.addEventListener('input', function () {
+    audioEl.volume = parseFloat(volEl.value);
+    audioEl.muted  = audioEl.volume === 0;
+    volEl.style.setProperty('--pct', (parseFloat(volEl.value) * 100) + '%');
+    updateVolIcon();
+  });
+
+  // Mute toggle
+  muteBtn.addEventListener('click', function () {
+    audioEl.muted = !audioEl.muted;
+    if (!audioEl.muted && audioEl.volume === 0) { audioEl.volume = 0.4; volEl.value = '0.4'; }
+    updateVolIcon();
+  });
+
+  // Sync time + seek position
+  audioEl.addEventListener('timeupdate', function () {
+    if (!seeking && audioEl.duration) {
+      seekEl.value = (audioEl.currentTime / audioEl.duration) * 100;
+      // Update CSS progress fill variable
+      seekEl.style.setProperty('--pct', seekEl.value + '%');
+    }
+    timeEl.textContent = fmt(audioEl.currentTime);
+  });
+
+  audioEl.addEventListener('durationchange', function () {
+    durEl.textContent = fmt(audioEl.duration);
+  });
+
+  audioEl.addEventListener('play',  updatePlayIcon);
+  audioEl.addEventListener('pause', updatePlayIcon);
+
+  // Init volume
+  audioEl.volume = 0.4;
+  volEl.value    = '0.4';
+  volEl.style.setProperty('--pct', '40%');
+  seekEl.style.setProperty('--pct', '0%');
+  updatePlayIcon();
+  updateVolIcon();
 }
