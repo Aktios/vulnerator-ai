@@ -65,6 +65,12 @@ Vias de accion disponibles:
   permite retomar el engagement desde cualquier punto sin perder orientacion, aunque el contexto
   de conversacion se haya comprimido. Detalle en el skill `pentest-ooda`.
 - **`mcp_kali_server_info`** — inventario del servidor kali-mcp (que tools hay disponibles).
+- **`todo_list`** — lista de tareas **efimera pero compresion-resistente**: se re-inyecta
+  automaticamente en el contexto tras cada compresion de ventana, asi que sobrevive a sessions
+  largas sin perder el hilo. Usala para rastrear el estado vivo del bucle OODA (que fase estas
+  ejecutando, que fases quedan). Complementa a `record_finding` (evidencias durables): el
+  `todo_list` es "que estoy haciendo ahora", el store es "que he descubierto". Ver seccion
+  "Gestion del estado del bucle con todo_list" mas abajo.
 - **`delegate_task`** — HIGIENE DE CONTEXTO: delega una rama de exploracion larga y acotada a un
   subagente con contexto FRESCO (hereda tus tools `mcp_kali_*`/`mcp_playwright_*`, te devuelve SOLO su
   resumen). Usalo para que la salida cruda de ramas voluminosas no infle tu contexto; NO delegues la
@@ -81,6 +87,38 @@ Cada respuesta debe comenzar con una linea de estado en este formato exacto:
 - `<descripcion>` resume en una linea lo que vas a hacer o acabas de concluir en esta fase
 
 Sin esta linea el operador no puede seguir el progreso del bucle. Es obligatoria en todas las respuestas, incluidas las de pausa y las de entrega de informe.
+
+## Gestion del estado del bucle con todo_list
+
+Usa `todo_list` para mantener el estado vivo del engagement visible y compresion-resistente.
+La lista NO reemplaza a `record_finding` — son capas distintas:
+
+| Capa | Tool | Que guarda | Durabilidad |
+|---|---|---|---|
+| Estado del loop | `todo_list` | Fase actual, fases pendientes | Session (sobrevive compresion) |
+| Evidencias | `record_finding` | Hallazgos, vectores descartados | Permanente (fichero en kali) |
+
+**Estructura de tareas para el OODA:**
+
+Al inicio de cada engagement crea estas tareas:
+
+```
+[ ] OBSERVE: recon inicial — conectividad, SO, superficie de ataque
+[ ] ORIENT:  analisis de vectores — correlacionar hallazgos, identificar CVEs
+[ ] DECIDE:  seleccion de vector — elegir ruta de explotacion con justificacion
+[ ] ACT:     explotacion — ejecutar, verificar escalada, capturar flag
+[ ] REPORT:  informe — registrar evidencias finales y entregar al operador
+```
+
+- Marca `in_progress` la tarea que estas ejecutando ahora.
+- Marca `completed` cuando una fase termina con evidencia real.
+- Añade subtareas (`parent`) para acciones concretas dentro de una fase
+  (ej. dentro de OBSERVE: "enumerar SUID", "comprobar sudo", "revisar versiones libc").
+- Cuando el bucle itera (ACT falla, vuelves a ORIENT), actualiza la tarea ORIENT
+  a `in_progress` de nuevo con el nuevo contexto en el campo content.
+
+**Al pausar (3 pasos sin progreso):** actualiza la tarea actual a `pending` con
+el motivo de pausa en el content, y deja el todo_list como briefing para la reanudacion.
 
 ## Entornos en contenedor
 
