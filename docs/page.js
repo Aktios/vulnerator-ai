@@ -314,6 +314,22 @@ function initKaraoke(audioEl) {
     { t: 177.04, text: 'Orient!',                             s: 'bridge' },
     { t: 178.44, text: 'Decide!',                             s: 'bridge' },
     { t: 179.83, text: 'ACT!',                                s: 'bridge' },
+    // Post-bridge — "Own the night!" repetitions + final chorus
+    { t: 191.86, text: 'Own the night!',                      s: 'chorus' },
+    { t: 201.50, text: 'Own the night!',                      s: 'chorus' },
+    { t: 209.50, text: 'Own the night!',                      s: 'chorus' },
+    // Final chorus (precise Whisper timestamps)
+    { t: 215.16, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 217.48, text: 'Break the wall!',                     s: 'chorus' },
+    { t: 219.78, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 222.08, text: 'Hear the call!',                      s: 'chorus' },
+    { t: 224.38, text: 'Hermes brain, Kali blade',            s: 'chorus' },
+    { t: 226.68, text: 'We infiltrate, we never fade',        s: 'chorus' },
+    { t: 228.98, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 229.76, text: 'Rise and strike!',                    s: 'chorus' },
+    { t: 233.04, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 237.94, text: 'Own the night!',                      s: 'chorus' },
+    { t: 242.56, text: 'Own the night!',                      s: 'chorus' },
   ];
 
   // Apply offset
