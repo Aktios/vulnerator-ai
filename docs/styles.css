@@ -1443,3 +1443,93 @@ body.has-sysbar .hero::before {
 @media (prefers-reduced-motion: reduce) {
   #vuln-flash.vuln-flash--go { animation: none; }
 }
+
+/* ── Content drawer ────────────────────────────────────────────── */
+#content-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(860px, 100vw);
+  height: 100vh;
+  background: var(--bg);
+  border-left: 2px solid var(--border);
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.7);
+}
+
+#content-drawer.drawer--open {
+  transform: translateX(0);
+}
+
+#drawer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+#drawer-title {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#drawer-close {
+  background: transparent;
+  border: 1px solid var(--border-dim);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.55rem;
+  line-height: 1.4;
+  transition: border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+#drawer-close:hover { border-color: var(--accent); color: var(--accent-soft); }
+
+#drawer-frame {
+  flex: 1;
+  border: none;
+  width: 100%;
+  background: var(--bg);
+}
+
+#drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4999;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.38s ease;
+}
+#drawer-backdrop.backdrop--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Nudge the waveform/karaoke zone when drawer is open on wide screens */
+@media (min-width: 860px) {
+  body.has-drawer #visualizer,
+  body.has-drawer #karaoke-zone,
+  body.has-drawer #audio-bar {
+    transition: width 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@media (max-width: 640px) {
+  #content-drawer { width: 100vw; }
+}

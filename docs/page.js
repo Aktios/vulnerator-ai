@@ -5,7 +5,94 @@
  * Initialises:
  *   1. SSH-style connection/OODA event toasts (bottom-left)
  *   2. Audio frequency spectrum visualiser (below sys-bar)
+ *   3. Karaoke — synchronized lyrics above the waveform
+ *   4. Audio controls bar (play/pause, seek, volume)
+ *   5. VULNERATOR! inversion flash
+ *   6. Scroll reveal animations (runs immediately, before boot)
  */
+
+/* ═══════════════════════════════════════════════════════════════
+   SCROLL REVEAL — fade + slide-up as elements enter the viewport.
+   Runs immediately (before boot) via IntersectionObserver.
+   No HTML changes needed — selects elements automatically.
+═══════════════════════════════════════════════════════════════ */
+(function initScrollReveal() {
+  if (!('IntersectionObserver' in window)) return;
+
+  // Elements to animate, in order of priority
+  var SELECTORS = [
+    '.section__title',
+    '.section__lead',
+    '.prose',
+    '.card',
+    '.feature-item',
+    '.lab-card',
+    '.report-card',
+    '.oss-block__text',
+    '.oss-block__stat',
+    '.code-block',
+    '.lazy-copy-row',
+    '.chips',
+    '.warning',
+    '.scope-list',
+    '.scope-note',
+    '.remediation-list li',
+  ].join(',');
+
+  var style = document.createElement('style');
+  style.textContent = `
+    .sr-hide {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.55s ease, transform 0.55s ease;
+    }
+    .sr-hide.sr-show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sr-hide { opacity: 1; transform: none; transition: none; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      var el = entry.target;
+      var delay = parseFloat(el.dataset.srDelay || 0);
+      setTimeout(function () {
+        el.classList.add('sr-show');
+      }, delay);
+      observer.unobserve(el);
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  function setup() {
+    var els = document.querySelectorAll(SELECTORS);
+    // Group siblings (same parent) for stagger
+    var parentMap = new Map();
+    els.forEach(function (el) {
+      var p = el.parentElement;
+      if (!parentMap.has(p)) parentMap.set(p, []);
+      parentMap.get(p).push(el);
+    });
+    parentMap.forEach(function (children) {
+      children.forEach(function (el, i) {
+        el.classList.add('sr-hide');
+        if (children.length > 1) el.dataset.srDelay = (i * 80);
+        observer.observe(el);
+      });
+    });
+  }
+
+  // Run after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setup);
+  } else {
+    setup();
+  }
+})();
 
 window.initPostBoot = function (audioEl) {
   initToasts();
