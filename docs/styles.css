@@ -1625,3 +1625,42 @@ body.has-sysbar .hero::before {
 @media (max-width: 640px) {
   #content-drawer { width: 100vw; }
 }
+
+/* ── Boot screen — mobile responsive ──────────────────────────── */
+@media (max-width: 640px) {
+  .boot__inner {
+    width: 94vw;
+    height: auto;
+    max-height: 88vh;
+    padding: 1.4rem 1.1rem;
+    border-radius: 5% / 3%;
+    transform: none; /* remove 3D tilt on mobile */
+  }
+
+  /* Sync overlay dimensions */
+  #boot::before,
+  #boot::after {
+    width: 94vw;
+    height: 88vh;
+    border-radius: 5% / 3%;
+    transform: none;
+  }
+
+  /* Smaller text + allow wrap on narrow screens */
+  .bl {
+    font-size: 0.70rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* Prompt text */
+  #boot-prompt {
+    font-size: 0.70rem;
+    letter-spacing: 0.18em;
+  }
+}
+
+@media (max-width: 380px) {
+  .bl { font-size: 0.62rem; }
+}
