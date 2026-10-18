@@ -109,6 +109,7 @@ mcp_servers:
 toolsets:
   - kali                 # MCP de la Kali (dinamico `mcp-kali`): tools de pentest CLI.
   - playwright           # MCP del navegador (dinamico `mcp-playwright`): web real. CERO tools nativas.
+  - todo                 # todo_list: estado vivo del bucle OODA, compresion-resistente (ver SOUL.md).
 
 # Defensa en profundidad (agent.disabled_toolsets, toolsets-reference.md): aunque `toolsets: [kali]`
 # ya excluye lo demas, se desactivan EXPLICITAMENTE los bundles nativos, por si un default de
