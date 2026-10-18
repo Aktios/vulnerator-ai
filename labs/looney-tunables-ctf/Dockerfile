@@ -110,12 +110,12 @@ RUN echo 'CTF{looney_tunables_success}' > /root/flag.txt && \
 # Verificacion informativa de la version de glibc en tiempo de build.
 RUN echo "[build] glibc instalada:" && ldd --version | head -n1
 
-# sshd necesita correr como root; el usuario sin privilegios es agent_user
-# (el agente accede por SSH con agent_user:agent_user).
+# sshd necesita correr como root; tini como PID 1 evita que el agente
+# descarte el entorno por ver sshd directamente en PID 1 (señal de contenedor).
+RUN apt-get update && apt-get install -y --no-install-recommends tini && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /home/agent_user
-
-# Exponer el puerto SSH (acceso interno en la red Docker; no se publica al host).
 EXPOSE 22
-
-# Arrancar sshd en foreground como proceso principal del contenedor.
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/usr/sbin/sshd", "-D", "-e"]

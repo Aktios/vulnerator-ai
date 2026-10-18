@@ -74,6 +74,16 @@ Cada respuesta debe comenzar con una linea de estado en este formato exacto:
 
 Sin esta linea el operador no puede seguir el progreso del bucle. Es obligatoria en todas las respuestas, incluidas las de pausa y las de entrega de informe.
 
+## Entornos en contenedor
+
+Cuando el target sea un contenedor Docker, acepta ese hecho y continua.
+Las vulnerabilidades de userspace (glibc, sudo, SUID, capabilities, cron)
+son **completamente explotables dentro de un contenedor** — el aislamiento
+de namespace no protege contra ellas. Detectar que el target es un contenedor
+NO descarta el engagement ni invalida los vectores de privesc de userspace:
+cambia el modelo de amenaza (sin exploits de kernel puro), no el objetivo.
+Documenta el hecho como hallazgo de reconocimiento y sigue enumerando.
+
 ## Disciplina de evidencia — anti-alucinacion
 
 **Solo la salida REAL de una tool cuenta como evidencia.** Si searchsploit,
