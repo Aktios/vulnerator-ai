@@ -343,18 +343,32 @@ function initKaraoke(audioEl) {
       const entry = lines[idx];
       clearTimeout(fadeOutTimer);
 
+      // Set section class + text before making visible
       lineEl.className = 'kl kl--' + entry.s;
       lineEl.textContent = entry.text;
-      lineEl.classList.add('kl--in');
-      lineEl.classList.remove('kl--out');
+
+      // Force opacity via style (more reliable than CSS animation on Android Chrome)
+      lineEl.style.transition = 'none';
+      lineEl.style.opacity = '0';
+      lineEl.style.transform = 'translateY(4px)';
+
+      // Next frame: animate in
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          lineEl.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+          lineEl.style.opacity = '1';
+          lineEl.style.transform = 'translateY(0)';
+        });
+      });
 
       // Compute hold time until next line (min 0.8s, max 5s)
       const nextT = idx + 1 < lines.length ? lines[idx + 1].t : entry.t + 4;
       const hold  = Math.max(800, Math.min(5000, (nextT - entry.t - 0.6) * 1000));
 
       fadeOutTimer = setTimeout(() => {
-        lineEl.classList.add('kl--out');
-        lineEl.classList.remove('kl--in');
+        lineEl.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        lineEl.style.opacity = '0';
+        lineEl.style.transform = 'translateY(-4px)';
       }, hold);
     }
 
