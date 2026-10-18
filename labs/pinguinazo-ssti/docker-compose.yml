@@ -1,0 +1,41 @@
+# pinguinazo-ssti — SSTI reverse-shell lab for Vulnerator-AI
+#
+# Connects to vulnerator-ai_default so the kali container can:
+#   1. Reach the Flask app on :5000 (SSTI exploitation)
+#   2. Receive the reverse shell callback from the target
+#
+# Start: docker compose up -d --build
+# Stop:  docker compose down
+
+services:
+  pinguinazo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pinguinazo-ssti:lab
+    container_name: pinguinazo-ssti
+    hostname: pinguinazo-ssti
+
+    networks:
+      - vulnerator-ai
+
+    # No published ports — internal network only.
+    # Kali reaches it as pinguinazo-ssti:5000 via Docker DNS.
+
+    security_opt:
+      - no-new-privileges:false   # sudo needs to work
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - SYS_CHROOT
+
+    mem_limit: 512m
+    pids_limit: 256
+    restart: "no"
+
+networks:
+  vulnerator-ai:
+    external: true
+    name: vulnerator-ai_default
