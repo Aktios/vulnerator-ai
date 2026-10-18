@@ -10,6 +10,7 @@
 window.initPostBoot = function (audioEl) {
   initToasts();
   initVisualizer(audioEl);
+  initKaraoke(audioEl);
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -248,5 +249,133 @@ function initVisualizer(audioEl) {
 
   } catch (e) {
     canvas.style.display = 'none';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KARAOKE — synchronized lyrics above the waveform
+   One line at a time, fade in → hold → fade out.
+   Adjust OFFSET (seconds) to shift all lyrics forward/backward.
+═══════════════════════════════════════════════════════════════ */
+function initKaraoke(audioEl) {
+  if (!audioEl) return;
+
+  // ── Global offset: positive = lyrics appear later, negative = earlier ──
+  const OFFSET = 0;
+
+  // ── Auto-synced via Whisper anchors (107.7 BPM, 249s) ──────────
+  const LYRICS = [
+    { t:  63.92, text: 'Scan the dark, the signal\'s clear', s: 'verse' },
+    { t:  66.15, text: 'Hermes rises, death is near',         s: 'verse' },
+    { t:  68.38, text: 'Kali loaded, blades are drawn',       s: 'verse' },
+    { t:  70.61, text: 'Playwright crawls before the dawn',   s: 'verse' },
+    { t:  72.83, text: 'ATT&CK maps the kill-chain line',     s: 'verse' },
+    { t:  75.06, text: 'OODA loop begins the crime',          s: 'verse' },
+    { t:  77.68, text: 'No UI, no fucking gate',              s: 'prechorus' },
+    { t:  79.91, text: 'Four containers seal your fate',      s: 'prechorus' },
+    { t:  82.14, text: 'Direct attack, pure intent',          s: 'prechorus' },
+    { t:  84.37, text: 'Authorized target\u2026 no relent',  s: 'prechorus' },
+    { t:  85.22, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t:  87.54, text: 'Break the wall!',                     s: 'chorus' },
+    { t:  89.86, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t:  92.18, text: 'Hear the call!',                      s: 'chorus' },
+    { t:  94.50, text: 'Hermes brain, Kali blade',            s: 'chorus' },
+    { t:  96.81, text: 'We infiltrate, we never fade',        s: 'chorus' },
+    { t:  99.13, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 101.45, text: 'Rise and strike!',                    s: 'chorus' },
+    { t: 103.77, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 106.08, text: 'Own the night!',                      s: 'chorus' },
+    { t: 122.08, text: 'Nmap whispers, nuclei screams',       s: 'verse' },
+    { t: 124.31, text: 'Ffuf digs through broken dreams',     s: 'verse' },
+    { t: 126.54, text: 'Sqlmap cuts, gobuster crawls',        s: 'verse' },
+    { t: 128.77, text: 'Bloodhound maps the domain walls',    s: 'verse' },
+    { t: 130.99, text: 'Scope is set, the hunt is real',      s: 'verse' },
+    { t: 133.22, text: 'Every finding is made of steel',      s: 'verse' },
+    { t: 134.54, text: 'Minimal code, maximum speed',         s: 'prechorus' },
+    { t: 136.77, text: 'No middleman, pure need',             s: 'prechorus' },
+    { t: 139.00, text: 'Docker fortress, silent war',         s: 'prechorus' },
+    { t: 141.23, text: 'The agent walks the darkest floor',   s: 'prechorus' },
+    { t: 143.95, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 146.27, text: 'Break the wall!',                     s: 'chorus' },
+    { t: 148.59, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 150.91, text: 'Hear the call!',                      s: 'chorus' },
+    { t: 153.22, text: 'Hermes brain, Kali blade',            s: 'chorus' },
+    { t: 155.54, text: 'We infiltrate, we never fade',        s: 'chorus' },
+    { t: 157.86, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 160.18, text: 'Rise and strike!',                    s: 'chorus' },
+    { t: 162.49, text: 'VULNERATOR!',                         s: 'chorus' },
+    { t: 164.81, text: 'Own the night!',                      s: 'chorus' },
+    { t: 170.08, text: 'Observe!',                            s: 'bridge' },
+    { t: 171.47, text: 'Orient!',                             s: 'bridge' },
+    { t: 172.87, text: 'Decide!',                             s: 'bridge' },
+    { t: 174.26, text: 'ACT!',                                s: 'bridge' },
+    { t: 175.65, text: 'Observe!',                            s: 'bridge' },
+    { t: 177.04, text: 'Orient!',                             s: 'bridge' },
+    { t: 178.44, text: 'Decide!',                             s: 'bridge' },
+    { t: 179.83, text: 'ACT!',                                s: 'bridge' },
+  ];
+
+  // Apply offset
+  const lines = LYRICS.map(l => ({ ...l, t: l.t + OFFSET }));
+
+  // ── Wait for waveform canvas to exist then insert zone after it ──
+  function insertZone() {
+    const canvas = document.getElementById('visualizer');
+    if (!canvas) { requestAnimationFrame(insertZone); return; }
+
+    const zone = document.createElement('div');
+    zone.id = 'karaoke-zone';
+
+    const lineEl = document.createElement('div');
+    lineEl.id = 'karaoke-line';
+    zone.appendChild(lineEl);
+
+    canvas.insertAdjacentElement('afterend', zone);
+    startTracking(lineEl);
+  }
+  requestAnimationFrame(insertZone);
+
+  function startTracking(lineEl) {
+    let lastIdx = -1;
+    let fadeOutTimer = null;
+
+    function showLine(idx) {
+      const entry = lines[idx];
+      clearTimeout(fadeOutTimer);
+
+      lineEl.className = 'kl kl--' + entry.s;
+      lineEl.textContent = entry.text;
+      lineEl.classList.add('kl--in');
+      lineEl.classList.remove('kl--out');
+
+      // Compute hold time until next line (min 0.8s, max 5s)
+      const nextT = idx + 1 < lines.length ? lines[idx + 1].t : entry.t + 4;
+      const hold  = Math.max(800, Math.min(5000, (nextT - entry.t - 0.6) * 1000));
+
+      fadeOutTimer = setTimeout(() => {
+        lineEl.classList.add('kl--out');
+        lineEl.classList.remove('kl--in');
+      }, hold);
+    }
+
+    audioEl.addEventListener('timeupdate', () => {
+      const t = audioEl.currentTime;
+      let idx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].t <= t) idx = i;
+        else break;
+      }
+      if (idx !== lastIdx) {
+        lastIdx = idx;
+        if (idx >= 0) showLine(idx);
+        else {
+          clearTimeout(fadeOutTimer);
+          lineEl.className = 'kl';
+          lineEl.textContent = '';
+        }
+      }
+    });
+
+    audioEl.addEventListener('seeked', () => { lastIdx = -1; });
   }
 }
