@@ -55,11 +55,17 @@ RUN apt-get update \
 # kali-linux-headless metapackage) to fix that latent gap while keeping the image reasonably sized:
 #   - nmap, whatweb, nuclei, ffuf, sqlmap, gobuster : web/recon tools used by the skills.
 #   - impacket-scripts                              : Impacket CLI helpers (AD/network).
-#   - bloodhound.py                                 : BloodHound Python ingestor (AD).
 # All package names were confirmed installable in kali-rolling (apt-get install --dry-run). Own
 # RUN layer with --no-install-recommends + rm -rf /var/lib/apt/lists/*, consistent with the style
 # above. Tools NOT baked here (anything else a skill needs ad-hoc) are still `apt install`-able on
 # the fly inside the ephemeral kali container.
+#
+# BloodHound ingestor (AD): el paquete apt `bloodhound.py` NO se instala aquí a propósito.
+# Su postinst de dpkg PETA contra el python3-impacket actual de kali-rolling (referencia
+# impacket/dcerpc/v5/dhcpm.py, eliminado upstream) y aborta este RUN y el build entero.
+# En su lugar se instala el sucesor activo `bloodhound` (PyPI, Python 3 puro, SIN postinst)
+# en el venv del servidor vía requirements.txt — expone el ejecutable `bloodhound-python`
+# en PATH. Ver docker/kali/requirements.txt para el pin y la nota de dependency-confusion.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       nmap \
@@ -69,7 +75,6 @@ RUN apt-get update \
       sqlmap \
       gobuster \
       impacket-scripts \
-      bloodhound.py \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/kali-mcp

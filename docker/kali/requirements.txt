@@ -19,6 +19,20 @@ mcp>=1.28,<2
 # anyio: dependencia del transporte asíncrono del SDK mcp (streamable-HTTP).
 anyio>=4
 
+# BloodHound.py — ingestor de Active Directory (dirkjanm/fox-it, basado en Impacket).
+#   Se instala por PIP (Python 3 puro, sin postinst de dpkg) en lugar del paquete apt
+#   `bloodhound.py`: ese paquete apt tiene un script postinst que PETA contra el
+#   python3-impacket actual de kali-rolling (referencia impacket/dcerpc/v5/dhcpm.py,
+#   eliminado upstream) y aborta el build entero de la imagen.
+#
+#   OJO con el nombre: el paquete correcto en PyPI es `bloodhound` (instala el ejecutable
+#   `bloodhound-python`). NO usar el nombre de instalación `bloodhound-python`: estuvo
+#   DESREGISTRADO en PyPI, lo que lo convierte en un vector de dependency-confusion
+#   (quien registre ese nombre ejecuta código en quien lo instale).
+#
+#   Compatible arm64/amd64 (Python puro). Versión fijada para reproducibilidad.
+bloodhound==1.9.0
+
 # ScoutSuite y Cloudsplaining (fuentes de collection EN VIVO adicionales) NO van aquí: se
 # instalan AISLADAS con pipx (venv propio por herramienta) en el Dockerfile.
 #
