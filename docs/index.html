@@ -401,7 +401,7 @@
             <div class="lab-card__links">
               <a href="https://github.com/irraz/vulnerator-ai/blob/master/labs/php2shell-lab/README.md" rel="noopener" target="_blank" class="lab-link">README</a>
               <a href="https://github.com/irraz/vulnerator-ai/tree/master/labs/php2shell-lab" rel="noopener" target="_blank" class="lab-link">Lab source</a>
-              <a href="https://thehackernews.com/2026/10/php2shell-what-actually-protects-you.html" rel="noopener" target="_blank" class="lab-link">CVE disclosure &rarr;</a>
+              <a href="php2shell-report-example.html" data-drawer="php2shell-report-example.html" class="lab-link lab-link--report">Sample CTF report &rarr;</a>
             </div>
           </li>
         </ul>
@@ -445,6 +445,22 @@
               to kali + flag captured. OODA loop in 12 steps.
             </p>
             <a href="pinguinazo-report-example.html" class="report-link report-link--ctf" data-drawer="pinguinazo-report-example.html">View full report &rarr;</a>
+          </li>
+          <li class="report-card">
+            <div class="report-card__top">
+              <span class="report-card__cvss report-card__cvss--ctf">CTF</span>
+              <div>
+                <span class="report-card__mode report-card__mode--ctf">mode: ctf</span>
+                <p class="report-card__cve">CVE-2026-109618 / CVE-2026-109619 — PHP2Shell Chain A</p>
+                <p class="report-card__target">host.docker.internal:18080 · PHP 8.2.34 · php2shell-lab</p>
+              </div>
+            </div>
+            <p class="report-card__summary">
+              Inyección de código PHP en fichero de sesión vía <code>session.upload_progress</code> + 
+              ejecución mediante LFI. RCE confirmado como www-data (uid=33). Session fixation + 
+              upload handler sin sanitización → arbitrary command execution. OODA loop en 7 hallazgos.
+            </p>
+            <a href="php2shell-report-example.html" class="report-link report-link--ctf" data-drawer="php2shell-report-example.html">View full report &rarr;</a>
           </li>
         </ul>
       </div>

