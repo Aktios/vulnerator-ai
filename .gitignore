@@ -54,3 +54,7 @@ backlog.md
 # Artefactos internos de agentes/workflows (informes, notas de verificación): no son producto.
 .agents/
 .worktrees/
+
+# --- Labs: exploits ejecutables nunca se versionan (SEGURIDAD) ---
+# Los labs documentan vulnerabilidades, pero exploits funcionales no deben estar en el repo.
+labs/**/exploits/

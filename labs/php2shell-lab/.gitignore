@@ -1,0 +1,31 @@
+# Labs php2shell — Ignorar ficheros generados y temporales
+
+# Ficheros de sesión generados por el lab
+webroot/sessions/
+sessions/
+
+# Logs de contenedores
+*.log
+
+# Backups de configuración
+*.bak
+*.backup
+
+# Ficheros temporales de testing
+test_*.py
+test_*.sh
+*.pyc
+__pycache__/
+
+# Datos sensibles (si se añaden payloads/scripts personalizados)
+exploits/
+payloads/
+*.secret
+
+# Docker compose override (si se personaliza localmente)
+docker-compose.override.yml
+
+# Artefactos de Vulnerator (si se ejecuta desde el lab)
+.agents/
+findings.jsonl
+pentest-report.*

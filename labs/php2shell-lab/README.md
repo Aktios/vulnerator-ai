@@ -95,9 +95,16 @@ docker compose down
 
 El `pull` inicial de las imágenes puede tardar; usa un timeout amplio la primera vez.
 
-## Referencias
+## Documentación adicional
 
-- Repo del PoC del investigador: `ikow/php2shell-poc` — https://github.com/ikow/php2shell-poc
-- Plantillas Nuclei: `Ademking/php2shell-nuclei-templates` — https://github.com/Ademking/php2shell-nuclei-templates
-- CVE-2026-109618
-- CVE-2026-109619
+- **[CHAINS.md](CHAINS.md)** — Detalle técnico de las 5 cadenas de ataque (A, B, C, D, E), mecánica completa y ejemplos de peticiones.
+- **[TESTING.md](TESTING.md)** — Guías de verificación paso a paso con scripts de prueba listos para ejecutar.
+- **[MANIFEST.md](MANIFEST.md)** — Inventario completo de ficheros, configuraciones y superficie de ataque.
+- **[examples/](examples/)** — Informes reales de explotaciones exitosas ejecutadas por Vulnerator contra el lab (ej. Chain A → RCE confirmado).
+
+## Referencias externas
+
+- Repo del PoC del investigador: [ikow/php2shell-poc](https://github.com/ikow/php2shell-poc)
+- Plantillas Nuclei: [Ademking/php2shell-nuclei-templates](https://github.com/Ademking/php2shell-nuclei-templates)
+- CVE-2026-109618 (OOM corruption)
+- CVE-2026-109619 (stale global state)

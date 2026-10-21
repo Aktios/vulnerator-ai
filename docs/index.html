@@ -380,6 +380,30 @@
               <a href="pinguinazo-report-example.html" data-drawer="pinguinazo-report-example.html" class="lab-link lab-link--report">Sample CTF report &rarr;</a>
             </div>
           </li>
+          <li class="lab-card">
+            <div class="lab-card__header">
+              <span class="lab-card__tag">WEB</span>
+              <span class="lab-card__tag lab-card__tag--red">CVE-2026-109618</span>
+              <span class="lab-card__tag lab-card__tag--red">CVE-2026-109619</span>
+              <span class="lab-card__tag lab-card__tag--dim">Docker</span>
+            </div>
+            <h3 class="lab-card__name">php2shell-lab</h3>
+            <p class="lab-card__body">
+              PHP 8.2.34 vulnerable environment with nginx + PHP-FPM and Apache + mod_php. The agent must discover and exploit <strong>PHP2Shell</strong> (CVE-2026-109618 / CVE-2026-109619) — session file deserialization vulnerabilities affecting PHP 5.4.0 through 8.5.11 (pre-8.2.35 / 8.3.24 / 8.4.6). Multiple attack chains available: session upload + LFI, handler mismatch deserialization, and mod_php OOM exploitation. Real 0-day discovered January 2026.
+            </p>
+            <div class="lab-card__meta">
+              <span>PHP 8.2.34 · nginx + FPM · Apache mod_php</span>
+              <span>&middot;</span>
+              <span>Ports 18080 (nginx), 18081 (apache)</span>
+              <span>&middot;</span>
+              <span>Chain A/C/D/E available</span>
+            </div>
+            <div class="lab-card__links">
+              <a href="https://github.com/irraz/vulnerator-ai/blob/master/labs/php2shell-lab/README.md" rel="noopener" target="_blank" class="lab-link">README</a>
+              <a href="https://github.com/irraz/vulnerator-ai/tree/master/labs/php2shell-lab" rel="noopener" target="_blank" class="lab-link">Lab source</a>
+              <a href="https://thehackernews.com/2026/10/php2shell-what-actually-protects-you.html" rel="noopener" target="_blank" class="lab-link">CVE disclosure &rarr;</a>
+            </div>
+          </li>
         </ul>
       </div>
     </section>
