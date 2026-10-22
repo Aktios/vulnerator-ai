@@ -39,6 +39,20 @@
   </sub>
 </p>
 
+---
+
+<p align="center">
+  <a href="https://youtu.be/XpCRds5raVs">
+    <img src="https://img.youtube.com/vi/XpCRds5raVs/maxresdefault.jpg" alt="Vulnerator-AI Demo Video" width="720">
+  </a>
+</p>
+
+<p align="center">
+  <sub>▶️ <a href="https://youtu.be/XpCRds5raVs"><b>Watch the demo</b></a> — OODA loop pentest in action</sub>
+</p>
+
+---
+
 OODA pentest driven by **Hermes** talking **directly** to a **Kali** container via MCP.
 
 ## What it is
