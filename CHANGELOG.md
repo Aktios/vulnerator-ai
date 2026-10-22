@@ -5,6 +5,21 @@ All notable changes to Vulnerator AI are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.6.0] - 2026-10-22
+
+### Added
+
+- **Kanban board tracking (optional)** — Hermes Agent's Kanban system integrated as opt-in tracking layer for long pentests. Provides crash recovery, dependency DAG, and audit trail without changing default OODA loop behavior. Enabled via `kanban` toolset in `config.yaml`.
+- **Increased delegation concurrency** — `max_concurrent_children` increased from 10 to 50 workers, validated by Nous 1,393-agent refactor (218 concurrent workers stable). Enables massive parallel scans for /24 networks.
+- **Complete Kanban documentation** — New guides: `agent-ooda/KANBAN-USAGE.md` (usage patterns, workflow examples, troubleshooting) and `docs/KANBAN-INTEGRATION.md` (technical changes, design decisions, roadmap).
+- **Extended SOUL.md** — New section "Loop state management with todo_list and Kanban" (74 lines) documenting when to use each tracking system and OODA+Kanban workflow patterns.
+
+### Changed
+
+- **Documentation language** — All repository documentation standardized to English for consistency.
+
 ## [1.5.0] - 2026-10-18
 
 ### Added
