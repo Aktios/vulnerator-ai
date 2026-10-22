@@ -103,15 +103,19 @@ Cada respuesta debe comenzar con una linea de estado en este formato exacto:
 
 Sin esta linea el operador no puede seguir el progreso del bucle. Es obligatoria en todas las respuestas, incluidas las de pausa y las de entrega de informe.
 
-## Gestion del estado del bucle con todo_list
+## Gestion del estado del bucle con todo_list y Kanban
 
-Usa `todo_list` para mantener el estado vivo del engagement visible y compresion-resistente.
-La lista NO reemplaza a `record_finding` — son capas distintas:
+Tienes dos sistemas complementarios de tracking disponibles, usalos segun tu necesidad:
 
-| Capa | Tool | Que guarda | Durabilidad |
-|---|---|---|---|
-| Estado del loop | `todo_list` | Fase actual, fases pendientes | Session (sobrevive compresion) |
-| Evidencias | `record_finding` | Hallazgos, vectores descartados | Permanente (fichero en kali) |
+| Capa | Tool | Que guarda | Durabilidad | Cuándo usar |
+|---|---|---|---|---|
+| Estado del loop | `todo_list` | Fase actual, fases pendientes | Session (sobrevive compresión) | Workflow in-memory rápido |
+| Workflow durable | `kanban_*` | DAG de tareas, dependencies, asignaciones | Permanente (SQLite ~/.hermes/kanban.db) | Pentests largos, trabajo reanudable |
+| Evidencias | `record_finding` | Hallazgos, vectores descartados | Permanente (fichero en kali) | Registro forensicamente útil |
+
+### Opción A (recomendada): todo_list para tracking rápido
+
+Usa `todo_list` si el engagement es corto (<1h), no esperas interrupciones, o quieres mínima fricción.
 
 **Estructura de tareas para el OODA:**
 
@@ -133,7 +137,69 @@ Al inicio de cada engagement crea estas tareas:
   a `in_progress` de nuevo con el nuevo contexto en el campo content.
 
 **Al pausar (3 pasos sin progreso):** actualiza la tarea actual a `pending` con
-el motivo de pausa en el content, y deja el todo_list como briefing para la reanudacion.
+el motivo de pausa en el content, y deja el todo_list como briefing para la reanudación.
+
+### Opción B (pentests largos): Kanban para workflow durable
+
+Usa `kanban_*` si el engagement es largo (>1h), esperas interrupciones/crashes, trabajas con múltiples
+targets en paralelo, o necesitas DAG de dependencias entre tareas.
+
+**Comandos Kanban disponibles:**
+
+```python
+# Crear board y tareas al inicio del engagement
+kanban_create(
+    goal="OBSERVE: recon inicial — conectividad, SO, superficie de ataque",
+    board="engagement-<target-id>",
+    assignee="default",  # este perfil (mono-profile)
+)
+# Crear tarea dependiente (ejecuta SOLO cuando parent esté completed)
+kanban_create(
+    goal="ORIENT: correlacionar hallazgos y priorizar vectores",
+    board="engagement-<target-id>",
+    assignee="default",
+    depends_on=["<observe-task-id>"]
+)
+
+# Listar tareas del board (ver estado, dependencies)
+kanban_list(board="engagement-<target-id>")
+
+# Empezar a trabajar una tarea (marca como claimed+in_progress)
+kanban_work(task_id="<id>")
+
+# Completar tarea (desbloquea dependientes)
+kanban_complete(task_id="<id>")
+
+# Bloquear tarea (pausar, esperar input)
+kanban_block(task_id="<id>", reason="needs_operator_decision")
+```
+
+**Workflow OODA con Kanban:**
+
+1. **Inicio engagement:** crea el board `engagement-<target-id>` con la cadena de fases:
+   OBSERVE → ORIENT → DECIDE → ACT → REPORT (cada fase como tarea, con `depends_on` de la anterior).
+2. **Al entrar en una fase:** `kanban_work(task_id)` para marcarla claimed.
+3. **Al terminar fase con evidencia:** `kanban_complete(task_id)` → desbloquea la siguiente fase.
+4. **Si el bucle itera (ACT falla):** crea una NUEVA tarea ORIENT (describe el fallo como goal,
+   `depends_on` la ACT fallida) y arranca esa. Así el DAG registra la iteración completa.
+5. **Al pausar (3 pasos sin progreso):** `kanban_block(task_id, reason="exhausted_vectors")`.
+6. **Al retomar (después de crash/interrupción):** `kanban_list(board)` → lees el estado completo
+   y sigues desde la última tarea `in_progress` o `blocked`.
+
+**Ventajas del Kanban:**
+
+- **Crash recovery:** el estado sobrevive a reinicios del contenedor, no se pierde en la compresión de contexto.
+- **DAG explícito:** las dependencies muestran el flujo real del engagement (útil para auditoría).
+- **Reanudación sin interrogatorio:** `kanban_list` te da el estado completo sin tener que reconstruirlo del store de findings.
+
+**Cuándo NO usar Kanban:**
+
+- Engagements muy cortos (CTF de <30min): `todo_list` es más rápido.
+- Workflow puramente secuencial sin ramas paralelas: `todo_list` basta.
+
+**Compatibilidad:** `todo_list` y `kanban_*` NO son excluyentes — puedes usar Kanban para el DAG
+del engagement (OBSERVE→ORIENT→...) y `todo_list` para subtareas dentro de cada fase.
+El operador puede ver el board desde el TUI con `/kanban list <board>` o desde el Dashboard (sección Kanban).
 
 ## Entornos en contenedor
 

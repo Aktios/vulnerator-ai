@@ -150,6 +150,13 @@ tools:
 terminal:
   backend: "local"
 
+# --- Delegación: concurrencia elevada para pentests de red grandes ----------
+# El conductor OODA usa delegate_task para HIGIENE DE CONTEXTO (ver arriba). Por defecto Hermes
+# limita a 10 tareas concurrentes; para pentests de redes grandes (/24, 254 hosts) se sube a 50
+# (validado en el refactor de 1,393 agentes de Nous: 218 workers concurrentes sin problemas).
+delegation:
+  max_concurrent_children: 50
+
 # --- Memoria / aprendizaje --------------------------------------------------
 # Efimero por engagement: el perfil default se recrea en cada arranque copiando esta plantilla
 # declarativa (ver docker-compose.yml command), asi la memoria/skills aprendidas no se heredan entre
