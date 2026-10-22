@@ -4,30 +4,41 @@
 
 set -e  # Exit on error
 
-echo "🔥 [1/5] Deteniendo y eliminando contenedores existentes..."
-docker-compose down -v || true  # -v elimina volúmenes también
+echo "🔥 [1/6] Deteniendo y eliminando contenedores existentes..."
+docker compose down -v 2>/dev/null || docker-compose down -v || true  # -v elimina volúmenes también
 
 echo ""
-echo "🧹 [2/5] Limpiando imágenes de Vulnerator-AI..."
-docker images | grep vulnerator | awk '{print $3}' | xargs -r docker rmi -f || true
+echo "🧹 [2/6] Limpiando imágenes de Vulnerator-AI..."
+docker images | grep vulnerator-ai | awk '{print $3}' | xargs docker rmi -f 2>/dev/null || true
 
 echo ""
-echo "🏗️  [3/5] Reconstruyendo imágenes desde cero (sin cache)..."
-docker-compose build --no-cache
+echo "🛠️  [3/6] Creando docker-compose temporal sin multi-platform..."
+# Crear versión temporal sin platforms: para evitar error multi-platform
+cp docker-compose.yml docker-compose.yml.bak
+sed -e '/platforms:/d' -e '/- linux\/arm64/d' -e '/- linux\/amd64/d' docker-compose.yml > docker-compose.tmp.yml
 
 echo ""
-echo "🚀 [4/5] Levantando contenedores..."
-docker-compose up -d
+echo "🏗️  [4/6] Reconstruyendo imágenes desde cero (sin cache)..."
+# Construir solo para la plataforma local (arm64 en Mac M2)
+DOCKER_BUILDKIT=1 docker compose -f docker-compose.tmp.yml build --no-cache --pull
 
 echo ""
-echo "⏳ [5/5] Esperando a que los servicios estén listos..."
+echo "🚀 [5/6] Levantando contenedores..."
+docker compose -f docker-compose.tmp.yml up -d
+
+echo ""
+echo "🧹 [6/6] Limpiando archivos temporales..."
+rm docker-compose.tmp.yml
+
+echo ""
+echo "⏳ Esperando a que los servicios estén listos..."
 sleep 5
 
 echo ""
 echo "✅ Contenedores reconstruidos y arrancados."
 echo ""
 echo "📋 Estado actual:"
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "🔍 Verificaciones:"
