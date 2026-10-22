@@ -1,303 +1,303 @@
 # Kanban Usage Guide — Vulnerator-AI
 
-## Resumen ejecutivo
+## Executive Summary
 
-Kanban en Hermes Agent es un sistema de tracking durable basado en SQLite (~/.hermes/kanban.db) que permite:
+Kanban in Hermes Agent is a durable tracking system based on SQLite (~/.hermes/kanban.db) that enables:
 
-- **Crash recovery:** el estado sobrevive reinicios del contenedor.
-- **DAG de dependencias:** tareas bloqueadas hasta que sus parents estén completed.
-- **Reanudación sin pérdida de contexto:** `kanban_list` recarga el estado completo del engagement.
+- **Crash recovery:** state survives container restarts.
+- **Dependency DAG:** tasks blocked until their parents are completed.
+- **Resumption without context loss:** `kanban_list` reloads complete engagement state.
 
-**Decisión tomada:** Opción A (OODA control total + Kanban como tracking). El conductor OODA sigue ejecutando su bucle OBSERVE→ORIENT→DECIDE→ACT, y opcionalmente registra el progreso en Kanban para auditoría/reanudación.
-
----
-
-## Cuándo usar Kanban vs todo_list
-
-| Criterio | Usa `todo_list` | Usa `kanban_*` |
-|----------|----------------|----------------|
-| Duración del engagement | <1h (CTF rápido) | >1h (pentest largo, múltiples sessions) |
-| Riesgo de interrupción | Bajo (session continua) | Alto (crashes, pausas operador) |
-| Paralelización de targets | No (1 target) | Sí (múltiples targets /24, Cloud) |
-| Auditoría post-engagement | No crítica | Crítica (DAG completo del workflow) |
-
-**Ambos NO son excluyentes:** puedes usar Kanban para el DAG del engagement (OBSERVE→ORIENT→...) y `todo_list` para subtareas efímeras dentro de cada fase.
+**Decision made:** Option A (OODA full control + Kanban as tracking). The OODA conductor continues executing its OBSERVE→ORIENT→DECIDE→ACT loop, and optionally records progress in Kanban for audit/resumption.
 
 ---
 
-## Tres vías de acceso a Kanban
+## When to use Kanban vs todo_list
 
-### 1. Tool calls directos (recomendado para OODA)
+| Criteria | Use `todo_list` | Use `kanban_*` |
+|----------|-----------------|----------------|
+| Engagement duration | <1h (quick CTF) | >1h (long pentest, multiple sessions) |
+| Interruption risk | Low (continuous session) | High (crashes, operator pauses) |
+| Target parallelization | No (1 target) | Yes (multiple targets /24, Cloud) |
+| Post-engagement audit | Not critical | Critical (complete workflow DAG) |
 
-El conductor OODA llama las funciones Python directamente:
+**Both are NOT mutually exclusive:** you can use Kanban for engagement DAG (OBSERVE→ORIENT→...) and `todo_list` for ephemeral subtasks within each phase.
+
+---
+
+## Three ways to access Kanban
+
+### 1. Direct tool calls (recommended for OODA)
+
+The OODA conductor calls Python functions directly:
 
 ```python
-# Crear board al inicio del engagement
+# Create board at engagement start
 kanban_create(
-    goal="OBSERVE: recon inicial — nmap, fingerprinting, enumeración básica",
+    goal="OBSERVE: initial recon — nmap, fingerprinting, basic enumeration",
     board="engagement-10.196.1.1",
     assignee="default"
 )
-# Salida: {"task_id": "1a2b3c4d", "status": "pending"}
+# Output: {"task_id": "1a2b3c4d", "status": "pending"}
 
-# Listar tareas del board
+# List board tasks
 kanban_list(board="engagement-10.196.1.1")
-# Salida: [{"task_id": "1a2b3c4d", "goal": "OBSERVE: ...", "status": "pending", ...}]
+# Output: [{"task_id": "1a2b3c4d", "goal": "OBSERVE: ...", "status": "pending", ...}]
 
-# Empezar a trabajar la tarea (marca como claimed+in_progress)
+# Start working on task (marks as claimed+in_progress)
 kanban_work(task_id="1a2b3c4d")
 
-# Completar tarea
+# Complete task
 kanban_complete(task_id="1a2b3c4d")
 ```
 
-### 2. Comandos `/kanban` en TUI/chat
+### 2. `/kanban` commands in TUI/chat
 
-Desde el TUI de Hermes o el chat web (Dashboard :9119), el operador puede ejecutar:
+From Hermes TUI or web chat (Dashboard :9119), operator can execute:
 
 ```bash
-# Crear tarea
-/kanban create --goal "OBSERVE: recon inicial" --board engagement-10.196.1.1
+# Create task
+/kanban create --goal "OBSERVE: initial recon" --board engagement-10.196.1.1
 
-# Listar tareas
+# List tasks
 /kanban list --board engagement-10.196.1.1
 
-# Ver detalles de una tarea
+# View task details
 /kanban view --task-id 1a2b3c4d
 
-# Completar tarea (si eres el assignee)
+# Complete task (if you're the assignee)
 /kanban complete --task-id 1a2b3c4d
 ```
 
-### 3. CLI `hermes kanban` (fuera del contenedor)
+### 3. CLI `hermes kanban` (outside container)
 
-Desde el host, con acceso al volumen de Hermes:
+From host, with access to Hermes volume:
 
 ```bash
-# Listar todos los boards
+# List all boards
 docker exec ooda-agent hermes kanban list
 
-# Ver tareas de un board
+# View board tasks
 docker exec ooda-agent hermes kanban list --board engagement-10.196.1.1
 
-# Crear tarea (requiere --profile si no estás en default)
+# Create task (requires --profile if not in default)
 docker exec ooda-agent hermes -p default kanban create \
-  --goal "OBSERVE: recon inicial" \
+  --goal "OBSERVE: initial recon" \
   --board engagement-10.196.1.1
 ```
 
 ---
 
-## Workflow OODA + Kanban (Opción A)
+## OODA + Kanban workflow (Option A)
 
-**Objetivo:** el OODA mantiene su bucle autónomo, Kanban registra el progreso para auditoría/reanudación.
+**Goal:** OODA maintains its autonomous loop, Kanban records progress for audit/resumption.
 
-### Inicio del engagement
+### Engagement start
 
 ```python
-# 1. Crear board con nombre descriptivo
+# 1. Create board with descriptive name
 board_name = f"engagement-{target_ip_or_id}"
 
-# 2. Crear cadena de fases con dependencias
+# 2. Create phase chain with dependencies
 observe_id = kanban_create(
-    goal="OBSERVE: recon inicial — nmap, fingerprinting, enumeración",
+    goal="OBSERVE: initial recon — nmap, fingerprinting, enumeration",
     board=board_name,
     assignee="default"
 )["task_id"]
 
 orient_id = kanban_create(
-    goal="ORIENT: correlacionar hallazgos, identificar CVEs, priorizar vectores",
+    goal="ORIENT: correlate findings, identify CVEs, prioritize vectors",
     board=board_name,
     assignee="default",
     depends_on=[observe_id]
 )["task_id"]
 
 decide_id = kanban_create(
-    goal="DECIDE: seleccionar vector de explotación con justificación",
+    goal="DECIDE: select exploitation vector with justification",
     board=board_name,
     assignee="default",
     depends_on=[orient_id]
 )["task_id"]
 
 act_id = kanban_create(
-    goal="ACT: ejecutar exploit, verificar escalada, capturar flag",
+    goal="ACT: execute exploit, verify escalation, capture flag",
     board=board_name,
     assignee="default",
     depends_on=[decide_id]
 )["task_id"]
 
 report_id = kanban_create(
-    goal="REPORT: registrar evidencias finales, entregar informe",
+    goal="REPORT: record final evidence, deliver report",
     board=board_name,
     assignee="default",
     depends_on=[act_id]
 )["task_id"]
 ```
 
-### Durante el bucle OODA
+### During OODA loop
 
 ```python
-# Al entrar en una fase (OBSERVE)
+# On phase entry (OBSERVE)
 kanban_work(task_id=observe_id)
-# → status cambia a "in_progress"
+# → status changes to "in_progress"
 
-# ... ejecutas tus steps de OBSERVE (nmap, curl, whatweb, etc.)
+# ... execute your OBSERVE steps (nmap, curl, whatweb, etc.)
 
-# Al completar fase con evidencia
+# On phase completion with evidence
 kanban_complete(task_id=observe_id)
-# → status cambia a "completed", desbloquea ORIENT
+# → status changes to "completed", unlocks ORIENT
 ```
 
-### Si el bucle itera (ACT falla → volver a ORIENT)
+### If loop iterates (ACT fails → return to ORIENT)
 
 ```python
-# 1. Completar ACT como "failed" (o simplemente no completar)
+# 1. Complete ACT as "failed" (or simply don't complete)
 kanban_block(task_id=act_id, reason="exploit_failed_need_alternative_vector")
 
-# 2. Crear NUEVA tarea ORIENT que depende de la ACT fallida
+# 2. Create NEW ORIENT task depending on failed ACT
 orient_retry_id = kanban_create(
-    goal="ORIENT (retry): exploit X falló, buscar alternativa (sudo, capabilities, cron)",
+    goal="ORIENT (retry): exploit X failed, find alternative (sudo, capabilities, cron)",
     board=board_name,
     assignee="default",
-    depends_on=[act_id]  # depende de la ACT fallida para registrar la iteración
+    depends_on=[act_id]  # depends on failed ACT to record iteration
 )["task_id"]
 
-# 3. Empezar esa nueva ORIENT
+# 3. Start that new ORIENT
 kanban_work(task_id=orient_retry_id)
 ```
 
-**Resultado:** el DAG del board muestra el flujo completo: OBSERVE → ORIENT → DECIDE → ACT (blocked) → ORIENT-retry → DECIDE-retry → ACT-success → REPORT.
+**Result:** board DAG shows complete flow: OBSERVE → ORIENT → DECIDE → ACT (blocked) → ORIENT-retry → DECIDE-retry → ACT-success → REPORT.
 
-### Al pausar (3 pasos sin progreso)
+### On pause (3 steps without progress)
 
 ```python
-# Bloquear la tarea actual con motivo
+# Block current task with reason
 kanban_block(
     task_id=current_task_id,
     reason="exhausted_vectors_need_operator_guidance"
 )
 ```
 
-### Al retomar (después de crash/interrupción)
+### On resume (after crash/interruption)
 
 ```python
-# 1. Listar tareas del board
+# 1. List board tasks
 tasks = kanban_list(board=board_name)
 
-# 2. Buscar la última tarea in_progress o blocked
+# 2. Find last in_progress or blocked task
 current_task = next(t for t in tasks if t["status"] in ["in_progress", "blocked"])
 
-# 3. Leer el contexto del store de findings
+# 3. Read context from findings store
 findings = mcp_kali_read_findings()
 
-# 4. Continuar desde ahí (kanban_work si estaba blocked)
+# 4. Continue from there (kanban_work if was blocked)
 if current_task["status"] == "blocked":
     kanban_work(task_id=current_task["task_id"])
 ```
 
 ---
 
-## Ejemplo completo: engagement de CTF
+## Complete example: CTF engagement
 
 ```python
-# === INICIO (paso 1 del OODA) ===
-OODA — OBSERVE (paso 1): configurando board Kanban para engagement-pinguinazo-ssti
+# === START (OODA step 1) ===
+OODA — OBSERVE (step 1): setting up Kanban board for engagement-pinguinazo-ssti
 
 board = "engagement-pinguinazo-ssti"
 
 observe_id = kanban_create(
-    goal="OBSERVE: fingerprint target, identificar tecnología web, buscar inputs",
+    goal="OBSERVE: fingerprint target, identify web tech, find inputs",
     board=board,
     assignee="default"
 )["task_id"]
 
 orient_id = kanban_create(
-    goal="ORIENT: correlacionar hallazgos, buscar CVEs de SSTI en framework detectado",
+    goal="ORIENT: correlate findings, search SSTI CVEs in detected framework",
     board=board,
     assignee="default",
     depends_on=[observe_id]
 )["task_id"]
 
-# ... (DECIDE, ACT, REPORT igual)
+# ... (DECIDE, ACT, REPORT same)
 
 kanban_work(task_id=observe_id)
 
-# Ahora ejecuto nmap, curl, whatweb...
+# Now execute nmap, curl, whatweb...
 mcp_kali_kali_run(command="nmap -sV -p 80,443 pinguinazo.local")
-# ... (resto de reconocimiento)
+# ... (rest of reconnaissance)
 
-# === FIN DE OBSERVE (paso 5) ===
-OODA — OBSERVE (paso 5): reconocimiento completado — Flask 2.0.1 detectado
+# === END OF OBSERVE (step 5) ===
+OODA — OBSERVE (step 5): reconnaissance completed — Flask 2.0.1 detected
 
 kanban_complete(task_id=observe_id)
-# → Desbloquea automáticamente ORIENT
+# → Automatically unlocks ORIENT
 
-# === INICIO DE ORIENT (paso 6) ===
-OODA — ORIENT (paso 6): analizando vulnerabilidades de Flask 2.0.1
+# === START OF ORIENT (step 6) ===
+OODA — ORIENT (step 6): analyzing Flask 2.0.1 vulnerabilities
 
 kanban_work(task_id=orient_id)
-# ... (análisis de CVEs, searchsploit, etc.)
+# ... (CVE analysis, searchsploit, etc.)
 ```
 
 ---
 
-## Visualización del board
+## Board visualization
 
-### Desde TUI/chat
+### From TUI/chat
 
 ```bash
-# Listar todos los boards
+# List all boards
 /kanban list
 
-# Ver tareas de un board
+# View board tasks
 /kanban list --board engagement-10.196.1.1
 ```
 
-### Desde Dashboard web (:9119)
+### From web Dashboard (:9119)
 
-1. Login en http://localhost:9119 (admin/vulnerator)
-2. Navegar a la sección **Kanban** (menú lateral)
-3. Seleccionar board `engagement-<target>`
-4. Ver DAG completo con estados y dependencias
+1. Login at http://localhost:9119 (admin/vulnerator)
+2. Navigate to **Kanban** section (sidebar menu)
+3. Select board `engagement-<target>`
+4. View complete DAG with states and dependencies
 
 ---
 
-## Multi-profile (futuro, NO implementado aún)
+## Multi-profile (future, NOT implemented yet)
 
-**Nota:** la Opción A (actual) usa un solo perfil (`default`). Kanban ya funciona en mono-profile como tracking durable. Si en el futuro quieres auto-dispatch (múltiples perfiles ejecutando tareas en paralelo):
+**Note:** Option A (current) uses single profile (`default`). Kanban already works in mono-profile as durable tracking. If in the future you want auto-dispatch (multiple profiles executing tasks in parallel):
 
 ```bash
-# Crear perfiles especializados
+# Create specialized profiles
 hermes profile create vulnerator-recon --clone --description "Recon specialist"
 hermes profile create vulnerator-exploit --clone --description "Exploitation worker"
 
-# Arrancar gateways
+# Start gateways
 hermes -p vulnerator-recon gateway start &
 hermes -p vulnerator-exploit gateway start &
 
-# Crear tareas con assignee específico
+# Create tasks with specific assignee
 kanban_create(
-    goal="OBSERVE: escanear /24 completo",
+    goal="OBSERVE: scan complete /24",
     board="engagement-192.168.1.0-24",
-    assignee="vulnerator-recon"  # auto-dispatch a ese perfil
+    assignee="vulnerator-recon"  # auto-dispatch to that profile
 )
 ```
 
-En mono-profile (actual), `assignee="default"` siempre y las tareas las ejecutas tú manualmente con `kanban_work`.
+In mono-profile (current), `assignee="default"` always and you execute tasks manually with `kanban_work`.
 
 ---
 
-## Comandos útiles
+## Useful commands
 
 ```python
-# Ver todas las tareas pending (sin assignee claim)
+# View all pending tasks (no assignee claim)
 kanban_list(board="engagement-X", status="pending")
 
-# Ver todas las tareas blocked (esperando decisión/input)
+# View all blocked tasks (waiting for decision/input)
 kanban_list(board="engagement-X", status="blocked")
 
-# Re-intentar tarea blocked
-kanban_work(task_id="1a2b3c4d")  # cambia blocked → in_progress
+# Retry blocked task
+kanban_work(task_id="1a2b3c4d")  # changes blocked → in_progress
 ```
 
 ---
@@ -306,30 +306,30 @@ kanban_work(task_id="1a2b3c4d")  # cambia blocked → in_progress
 
 ### "Task has unmet dependencies"
 ```python
-# Intentaste kanban_work en una tarea cuyo parent no está completed
-# Solución: completar el parent primero, o cambiar depends_on
+# You tried kanban_work on task whose parent isn't completed
+# Solution: complete parent first, or change depends_on
 ```
 
 ### "Task already claimed by another assignee"
 ```python
-# En multi-profile: otro perfil ya la reclamó
-# En mono-profile: no debería pasar (assignee="default" siempre)
+# In multi-profile: another profile already claimed it
+# In mono-profile: shouldn't happen (assignee="default" always)
 ```
 
 ### "Database locked"
 ```python
-# Raro: dos procesos Hermes accediendo a ~/.hermes/kanban.db simultáneamente
-# Solución: espera unos segundos y reintenta
+# Rare: two Hermes processes accessing ~/.hermes/kanban.db simultaneously
+# Solution: wait a few seconds and retry
 ```
 
 ---
 
-## Referencias
+## References
 
-- **Spec oficial:** `docs/hermes-kanban-v1-spec.pdf` (GitHub NousResearch/hermes-agent feat/kanban-standing)
+- **Official spec:** `docs/hermes-kanban-v1-spec.pdf` (GitHub NousResearch/hermes-agent feat/kanban-standing)
 - **Profiles:** https://hermes-agent.nousresearch.com/docs/user-guide/profiles
-- **Issue tracking:** https://github.com/NousResearch/hermes-agent/issues/344 (roadmap futuro, NO actual)
+- **Issue tracking:** https://github.com/NousResearch/hermes-agent/issues/344 (future roadmap, NOT current)
 
 ---
 
-**Última actualización:** 2026-10-22 — Vulnerator-AI commit ???
+**Last update:** 2026-10-22 — Vulnerator-AI commit ???
